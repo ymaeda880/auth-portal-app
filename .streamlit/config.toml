@@ -1,0 +1,9 @@
+# .streamlit/config.toml
+# プロジェクト名：auth_portal_app
+
+[server]
+port = 8591
+address = "0.0.0.0"
+baseUrlPath = "/auth_portal"
+enableCORS = false
+headless = true

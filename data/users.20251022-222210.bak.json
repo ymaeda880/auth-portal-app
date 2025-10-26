@@ -1,0 +1,28 @@
+{
+  "users": {
+    "maeda": {
+      "pw": "scrypt:32768:8:1$DqsFdgMsVeMZppfq$c150f5b44eca4c1837895b091498c75f52869b0dcc61693877188aec04c8ab7115c796a13b0a2a583ba453a91875709409594e00abfaddba5c1902292170e760",
+      "apps": [
+        "bot",
+        "minutes",
+        "login_test",
+        "image_maker"
+      ]
+    },
+    "yasuo": {
+      "pw": "scrypt:32768:8:1$cdxZo8N56tFBvnPS$420dcfde5473da30d3587f9bdad863575d3ce1d7571917e1700c4d86db611befbad652ce907bb0bf68ec7670ee9dbb79631b07931a79236fac9691875d380685",
+      "apps": [
+        "bot",
+        "minutes",
+        "login_test",
+        "image_maker"
+      ]
+    },
+    "admin": {
+      "pw": "scrypt:32768:8:1$aVtUuK0rpdUoHN9G$1457d1c2cade5ef763d912dc5c85aace62a4b99f5b946530e3c1b45d70fab598c907db933bcdfd3e964a55469852be7c805f72cf992f6587c5a6ef61946549d7",
+      "apps": [
+        "bot"
+      ]
+    }
+  }
+}

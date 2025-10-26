@@ -1,0 +1,49 @@
+# .streamlit/settings.toml
+# ==========================================
+# プロジェクト名：auth_portal_app
+# ==========================================
+
+# -------------------------------
+# アクセスレベル設定
+# -------------------------------
+
+# ログイン不要（公開アプリ）
+[access.public]
+apps = [
+    "bot",              # RAGチャットボット
+    "minutes",          # 議事録生成アプリ
+]
+
+# ログイン必須（一般ユーザー）
+[access.user]
+apps = [
+    "image_maker"       # 画像生成アプリ
+]
+
+# 許可された人のみ（restricted）
+[access.restricted]
+apps = [
+    "login_test",       # 特定ユーザーにのみ許可
+    "slide_viewer",
+
+]
+
+# 管理者のみ
+[access.admin]
+apps = [
+    "command_station",  # サーバー制御・Nginx操作
+    "doc_manager",      # PDF整理・OCR
+    "auth_portal",      # 認証管理そのもの
+]
+
+# -------------------------------
+# 管理者ユーザー（ログイン名を列挙）
+# -------------------------------
+[admin_users]
+users = ["maeda", "admin"]
+
+# -------------------------------
+# 制限アプリ（restricted）の許可ユーザー
+# -------------------------------
+[restricted_users]
+login_test = ["maeda", "admin"]
