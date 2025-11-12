@@ -34,6 +34,7 @@ APP_LABELS = {
     "command_station":"🛠️ コマンドステーション",
     "doc_manager":    "📚 文書整理・OCR",
     "auth_portal":    "🔐 認証ポータル",
+    "text_studio":    "🖍️ 文章校正",
 }
 
 APP_HELP = {
@@ -45,4 +46,5 @@ APP_HELP = {
     "command_station":"Git/サービス操作など運用ツール",
     "doc_manager":    "PDF整理・OCR・ベクトル化",
     "auth_portal":    "ユーザー/権限/SSOの管理",
+    "text_studio":    "文章の校正"
 }

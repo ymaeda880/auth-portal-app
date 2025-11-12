@@ -1,4 +1,4 @@
-# .streamlit/settings.toml
+# auth_portal_app/.streamlit/settings.toml
 # ==========================================
 # プロジェクト名：auth_portal_app
 # ==========================================
@@ -12,6 +12,7 @@
 apps = [
     "bot",              # RAGチャットボット
     "minutes",          # 議事録生成アプリ
+    "text_studio",      # 文書校正アプリ
 ]
 
 # ログイン必須（一般ユーザー）
