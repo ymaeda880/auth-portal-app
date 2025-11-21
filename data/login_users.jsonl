@@ -92,3 +92,5 @@
 {"ts": "2025-11-04T09:58:09", "user": "maeda", "event": "login", "next": "/", "exp": 1762246689}
 {"ts": "2025-11-04T10:25:47", "user": "maeda", "event": "login", "next": "/", "exp": 1762248347}
 {"ts": "2025-11-11T15:58:54", "user": "maeda", "event": "login", "next": "/", "exp": 1762873134}
+{"ts": "2025-11-12T13:22:50", "user": "admin", "event": "login", "next": "/", "exp": 1762950170}
+{"ts": "2025-11-20T11:34:13", "user": "maeda", "event": "login", "next": "/", "exp": 1763634853}
