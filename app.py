@@ -14,6 +14,8 @@ from lib.access_settings import load_access_settings, base_path_of
 from lib.users import load_users, atomic_write_json, append_login_log
 from lib.web_utils import safe_next
 
+from lib.app.explanation import render_portal_usage_expander
+
 PROJECTS_ROOT = Path(__file__).resolve().parents[2]  # or 3 for pages
 if str(PROJECTS_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECTS_ROOT))
@@ -25,6 +27,9 @@ from common_lib.auth.jwt_utils import issue_jwt, verify_jwt
 # ───────────────── 基本設定 ─────────────────
 st.set_page_config(page_title="Auth Portal", page_icon="🔐", layout="wide")
 st.title("🔐 ポータル")
+
+# ここで説明 expander を表示
+render_portal_usage_expander()
 
 # 統一ボタンCSS（同じ高さ・同じ幅）
 st.markdown("""
