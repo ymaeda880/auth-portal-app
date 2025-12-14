@@ -14,6 +14,12 @@
     },
     "mm": {
       "pw": "scrypt:32768:8:1$o1P3eKysaocldxAW$e71c20c7dd02e0f1d8e81933fe346872a877946ed479ccbdac4f72fea81d7f9232061160a546123af317936992e087ebb4f9d8c1831b5636f2022e2cc28fdff9"
+    },
+    "y-maeda": {
+      "pw": "scrypt:32768:8:1$xuyQOP45DzdUbGUj$55d5fafdea3eebd3a89e4f73d696aa83541f640fbece217e5ab58009626aabc75e8cab2710318c95c9066bc9a846bbb44b5787b9f9bc5aaa905b216e69259819"
+    },
+    "ym": {
+      "pw": "scrypt:32768:8:1$YzMHJQ1bqAeg7Kt3$95a43356a5da1bef3eb97323c0d8d9fbbf7f5bb2372e1d53e9f3a6d46e8aeb00bd709d536dd5a81897759398c77af11600fae270b9c46ac17fd8550139c99496"
     }
   }
 }

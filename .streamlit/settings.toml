@@ -41,10 +41,10 @@ apps = [
 # 管理者ユーザー（ログイン名を列挙）
 # -------------------------------
 [admin_users]
-users = ["maeda", "admin"]
+users = ["maeda", "admin", "t-okamoto", "y-maeda"]
 
 # -------------------------------
 # 制限アプリ（restricted）の許可ユーザー
 # -------------------------------
 [restricted_users]
-login_test = ["maeda", "admin"]
+login_test = ["maeda", "y-maeda", "admin"]
