@@ -64,53 +64,20 @@ st.success(f"ログイン中ユーザー: **{username}**")
 
 # ===== 部署の選択肢（必要に応じて増減可）=====
 DEPARTMENTS = [
-    "総務", "人事", "経理", "営業", "開発", "研究",
-    "法務", "カスタマーサポート", "管理部", "その他"
+    "総務部", "経理部", "企画開発部", "新規事業開発室",
+    "環境調査部", "環境計画部", "都市・地域計画部", "歴史・文化計画部",
+    "環境設計部",
+    "その他"
 ]
 
 # ===== 既存レコードの反映 =====
 db = load_user_info_db()
 record = (db.get("users") or {}).get(username) or {}
 
-# 既存値
-old_last = record.get("last_name", "")
-old_first = record.get("first_name", "")
-old_dept = record.get("department", "その他")
 
-with st.form("user_info_form", clear_on_submit=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        last_name = st.text_input("姓", value=old_last, placeholder="山田")
-    with col2:
-        first_name = st.text_input("名", value=old_first, placeholder="太郎")
 
-    dept = st.selectbox("部署", options=DEPARTMENTS, index=DEPARTMENTS.index(old_dept) if old_dept in DEPARTMENTS else DEPARTMENTS.index("その他"))
-    dept_other = ""
-    if dept == "その他":
-        dept_other = st.text_input("部署（その他・自由入力）", value=(old_dept if old_dept not in DEPARTMENTS else ""))
 
-    submitted = st.form_submit_button("💾 登録 / 更新", use_container_width=True)
 
-if submitted:
-    # 入力検証（必須）
-    if not last_name.strip() or not first_name.strip():
-        st.error("姓と名を入力してください。")
-    else:
-        chosen_dept = dept_other.strip() if dept == "その他" and dept_other.strip() else dept
-
-        # 更新内容
-        new_record = {
-            "last_name": last_name.strip(),
-            "first_name": first_name.strip(),
-            "department": chosen_dept,
-            "updated_at": dt.datetime.now().isoformat(timespec="seconds"),
-        }
-        db.setdefault("users", {})[username] = new_record
-        try:
-            save_user_info_db(db)
-            st.success("ユーザー情報を保存しました。")
-        except Exception as e:
-            st.error(f"保存に失敗しました: {e}")
 
 # ===== 既存レコードの表示（確認用）=====
 st.markdown("---")
@@ -120,3 +87,57 @@ if current:
     st.json(current)
 else:
     st.info("まだ登録がありません。フォームから登録してください。")
+# 既存値
+old_last = record.get("last_name", "")
+old_first = record.get("first_name", "")
+old_email = record.get("email", "")
+old_dept = record.get("department", "その他")
+
+with st.form("user_info_form", clear_on_submit=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        last_name = st.text_input("姓", value=old_last, placeholder="山田")
+    with col2:
+        first_name = st.text_input("名", value=old_first, placeholder="太郎")
+
+    email = st.text_input("メールアドレス", value=old_email, placeholder="taro.yamada@example.com")
+
+    dept = st.selectbox(
+        "部署",
+        options=DEPARTMENTS,
+        index=DEPARTMENTS.index(old_dept) if old_dept in DEPARTMENTS else DEPARTMENTS.index("その他")
+    )
+    dept_other = ""
+    if dept == "その他":
+        dept_other = st.text_input(
+            "部署（その他・自由入力）",
+            value=(old_dept if old_dept not in DEPARTMENTS else "")
+        )
+
+    submitted = st.form_submit_button("💾 登録 / 更新", use_container_width=True)
+
+if submitted:
+    # 入力検証（必須）
+    if not last_name.strip() or not first_name.strip():
+        st.error("姓と名を入力してください。")
+    elif not email.strip():
+        st.error("メールアドレスを入力してください。")
+    elif "@" not in email or "." not in email.split("@")[-1]:
+        st.error("メールアドレスの形式が正しくありません。")
+    else:
+        chosen_dept = dept_other.strip() if dept == "その他" and dept_other.strip() else dept
+
+        # 更新内容
+        new_record = {
+            "last_name": last_name.strip(),
+            "first_name": first_name.strip(),
+            "email": email.strip(),
+            "department": chosen_dept,
+            "updated_at": dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        db.setdefault("users", {})[username] = new_record
+        try:
+            save_user_info_db(db)
+            st.success("ユーザー情報を保存しました。")
+        except Exception as e:
+            st.error(f"保存に失敗しました: {e}")

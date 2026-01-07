@@ -4,6 +4,17 @@ import datetime as dt
 from pathlib import Path
 import sys
 
+# ============================================================
+# sys.path（common_lib / lib を必ず import 可能に）
+# ★ すべての自作 import より前に置く（最重要）
+# ============================================================
+PROJECTS_ROOT = Path(__file__).resolve().parents[2]  # .../projects
+if str(PROJECTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECTS_ROOT))
+
+APP_ROOT = Path(__file__).resolve().parent  # auth_portal_app ディレクトリ
+
+
 import streamlit as st
 import streamlit.components.v1 as components
 import extra_streamlit_components as stx
@@ -16,13 +27,14 @@ from lib.web_utils import safe_next
 
 from lib.app.explanation import render_portal_usage_expander
 
-PROJECTS_ROOT = Path(__file__).resolve().parents[2]  # or 3 for pages
-if str(PROJECTS_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECTS_ROOT))
-
 from common_lib.auth.config import COOKIE_NAME
 from common_lib.ui.ui_basics import thick_divider
 from common_lib.auth.jwt_utils import issue_jwt, verify_jwt
+
+
+from lib.notices.db import notice_db_path
+from lib.notices.renderer import render_notices_block
+
 
 # ───────────────── 基本設定 ─────────────────
 st.set_page_config(page_title="Auth Portal", page_icon="🔐", layout="wide")
@@ -30,6 +42,12 @@ st.title("🔐 ポータル")
 
 # ここで説明 expander を表示
 render_portal_usage_expander()
+
+# ───────────────── 告知表示 ─────────────────
+render_notices_block(
+    db_path=notice_db_path(APP_ROOT),
+    limit=20,
+)
 
 # 統一ボタンCSS（同じ高さ・同じ幅）
 st.markdown("""
@@ -71,6 +89,10 @@ with st.sidebar:
             st.session_state["show_login_form"] = True
             st.success("ログアウトしました。")
 
+        st.caption(
+            "ログアウト後はリロードが必要ですが、そのままブラウザーを閉じてもOKです。"
+            "ログアウトしないでブラウザーを閉じた場合は，ログイン後8時間はログインが有効になっています．"
+        )
     #else:
     #    st.info("未ログインです。サインインしてください。")
 

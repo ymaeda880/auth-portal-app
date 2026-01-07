@@ -48,3 +48,20 @@ users = ["maeda", "admin", "t-okamoto", "y-maeda"]
 # -------------------------------
 [restricted_users]
 login_test = ["maeda", "y-maeda", "admin"]
+
+
+# 以下は不要
+# -----------------------------------------
+# インボックスのファイルの保存先（location 別）
+# -----------------------------------------
+# インボックスのファイルの保存先（将来切替したい瞬間に mode="external" に変える）
+[inbox.storage]
+# "internal" または "external"
+#mode = "internal"  
+# mode = "external"   
+
+[inbox.storage.Home]
+#root = "/Volumes/Extreme SSD/InBoxStorages"
+
+[inbox.storage.Prec]
+#root = "/Volumes/PrecSSD/InBoxStorages"
