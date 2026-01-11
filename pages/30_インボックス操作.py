@@ -293,15 +293,16 @@ TAG_PRESETS = [
     ("その他", "その他/"),
 ]
 
-
 KIND_ICON = {
     "image": "🖼️",
     "pdf": "📄",
     "word": "📝",
+    "ppt": "📑",
     "excel": "📊",
     "text": "📃",
     "other": "📦",
 }
+
 
 
 # ============================================================
@@ -311,6 +312,7 @@ def kind_label(kind: str) -> str:
     return {
         "pdf": "PDF",
         "word": "Word",
+        "ppt": "PPT",
         "excel": "Excel",
         "text": "テキスト",
         "image": "図・画像",
@@ -625,7 +627,8 @@ name_terms = split_terms_and(name_q)
 # ============================================================
 # 詳細条件（初期値：必ず定義しておく）
 # ============================================================
-ALL_KINDS = ["pdf", "word", "excel", "text", "image", "other"]
+ALL_KINDS = ["pdf", "word", "ppt", "excel", "text", "image", "other"]
+
 
 # --- kinds の state 正本（OFFでも維持したいので、ここで必ず準備） ---
 K_KIND_FLAGS = "inbox21_kind_flags"

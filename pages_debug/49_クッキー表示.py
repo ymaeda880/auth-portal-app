@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pages/42_cookie表示.py
+# pages/49_cookie表示.py
 from __future__ import annotations
 
 import datetime as dt

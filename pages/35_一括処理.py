@@ -119,17 +119,20 @@ JST = timezone(timedelta(hours=9))
 PAGE_SIZE = 10
 INBOX_ROOT = resolve_inbox_root(PROJECTS_ROOT)
 
-ALL_KINDS = ["pdf", "word", "excel", "text", "image", "other"]
+ALL_KINDS = ["pdf", "word", "excel", "ppt", "text", "image", "other"]
+
 
 def kind_label(kind: str) -> str:
     return {
         "pdf": "PDF",
         "word": "Word",
         "excel": "Excel",
+        "ppt": "PPT",
         "text": "テキスト",
         "image": "図・画像",
         "other": "その他",
     }.get((kind or "").lower(), kind)
+
 
 # ============================================================
 # Streamlit UI
@@ -241,7 +244,7 @@ if bool(st.session_state.get(K_SEARCH_ADV_OPEN)):
     st.markdown("---")
 
     # 種類
-    c_k = st.columns(6)
+    c_k = st.columns(len(ALL_KINDS))
     for col, k in zip(c_k, ALL_KINDS):
         with col:
             st.checkbox(
@@ -249,6 +252,7 @@ if bool(st.session_state.get(K_SEARCH_ADV_OPEN)):
                 key=f"{K_KIND_FLAGS}_{k}",
                 value=bool(st.session_state[K_KIND_FLAGS].get(k, True)),
             )
+
     for k in ALL_KINDS:
         st.session_state[K_KIND_FLAGS][k] = bool(st.session_state.get(f"{K_KIND_FLAGS}_{k}", True))
     kinds_checked = [k for k in ALL_KINDS if st.session_state[K_KIND_FLAGS].get(k, True)]

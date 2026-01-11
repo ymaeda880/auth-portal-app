@@ -13,7 +13,6 @@ if str(PROJECTS_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECTS_ROOT))
 
 APP_ROOT = Path(__file__).resolve().parent  # auth_portal_app ディレクトリ
-APP_NAME = APP_ROOT.name
 
 
 import streamlit as st
@@ -32,11 +31,16 @@ from common_lib.auth.config import COOKIE_NAME
 from common_lib.ui.ui_basics import thick_divider
 from common_lib.auth.jwt_utils import issue_jwt, verify_jwt
 
+
 from lib.notices.db import notice_db_path
 from lib.notices.renderer import render_notices_block
 
 # --- sessions 共通ロジック ---
-from common_lib.sessions import SessionConfig, init_session, heartbeat_tick
+from common_lib.sessions import (
+    SessionConfig,
+    init_session,
+    heartbeat_tick,
+)
 
 
 # ───────────────── 基本設定 ─────────────────
@@ -45,59 +49,23 @@ st.set_page_config(page_title="Auth Portal", page_icon="🔐", layout="wide")
 # ------------------------------------------------------------
 # セッション設定（設計で確定した値）
 # ------------------------------------------------------------
-SESSIONS_DB = (
-    PROJECTS_ROOT / "Storages" / "_admin" / "sessions" / "sessions.db"
+SESSION_CFG = SessionConfig(
+    app_name="command_station_app",# ★ 確定：識別子
 )
-CFG = SessionConfig()  # heartbeat=30s, TTL=120s（既定）
+
+# ------------------------------------------------------------
+# セッション初期化（初回のみ）
+# ------------------------------------------------------------
+init_session(cfg=SESSION_CFG)
+
+# ------------------------------------------------------------
+# heartbeat（30秒ごと）
+# Streamlit 再実行時に軽量に呼ばれる
+# ------------------------------------------------------------
+heartbeat_tick(cfg=SESSION_CFG)
 
 
-def _tick_sessions(user_sub: str | None) -> None:
-    """
-    auth_portal はログイン前後で user が変わるため、
-    「ログイン済みのときだけ」sessions を更新する。
-    """
-    if not user_sub:
-        return
-    init_session(db_path=SESSIONS_DB, cfg=CFG, user_sub=user_sub, app_name=APP_NAME)
-    heartbeat_tick(db_path=SESSIONS_DB, cfg=CFG, user_sub=user_sub, app_name=APP_NAME)
-
-
-def render_pais_header(
-    logo_relpath: str = "assets/logo_chick.png",
-    logo_px: int = 120,
-) -> None:
-    logo_path = Path(logo_relpath)
-
-    # 左を太めにしてロゴを主役に
-    c1, c2 = st.columns([4, 12], vertical_alignment="center")
-
-    with c1:
-        if logo_path.is_file():
-            st.image(str(logo_path), width=logo_px)  # use_container_width は使わない
-        else:
-            st.write("🐤")
-
-    with c2:
-        # タイトルを「明示的に2段」で描画
-        st.markdown(
-            """
-            <div style="line-height:1.15; margin:0; padding:0;">
-              <h1 style="margin:0; padding:0;">
-                プレックAIシステム
-              </h1>
-              <h2 style="margin:6px 0 0 0; padding:0; font-weight:600;">
-                （PAIS）ポータル
-              </h2>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-# 呼び出し
-render_pais_header()
-
-
-#st.title("🔐 プレックAIシステム（PAIS）ポータル")
+st.title("🔐 ポータル")
 
 # ここで説明 expander を表示
 render_portal_usage_expander()
@@ -134,9 +102,6 @@ payload = verify_jwt(cm.get(COOKIE_NAME))
 if payload and "current_user" not in st.session_state:
     st.session_state["current_user"] = payload.get("sub")
 user = st.session_state.get("current_user")
-
-# ★ ログイン済みならここで sessions 更新（JWT復元のケースも含む）
-_tick_sessions(user)
 
 # ───────────────── サイドバー：アカウント操作 ─────────────────
 with st.sidebar:
@@ -225,9 +190,6 @@ if st.session_state.get("show_login_form"):
                     "exp": exp
                 })
                 st.success("✅ ログインしました")
-
-                # ★ この run で確実に sessions 記録（次の rerun を待たない）
-                _tick_sessions(u)
 
 
 thick_divider(color="Blue", height=3, margin="1.5em 0")
@@ -334,3 +296,5 @@ with st.expander("🔑 パスワード変更（本人）", expanded=False):
                 db["users"][user] = rec
                 atomic_write_json(USERS_FILE, db)
                 st.success("パスワードを変更しました。")
+
+

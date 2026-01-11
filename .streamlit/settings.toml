@@ -10,14 +10,14 @@
 # ログイン不要（公開アプリ）
 [access.public]
 apps = [
-    "bot",              # RAGチャットボット
-    "minutes",          # 議事録生成アプリ
-    "text_studio",      # 文書校正アプリ
 ]
 
 # ログイン必須（一般ユーザー）
 [access.user]
 apps = [
+    "bot",              # RAGチャットボット
+    "minutes",          # 議事録生成アプリ
+    "text_studio",      # 文書校正アプリ
     "image_maker"       # 画像生成アプリ
 ]
 
