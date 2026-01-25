@@ -7,6 +7,8 @@ from pathlib import Path
 import streamlit as st
 
 # ========= パス類 =========
+# ここは「auth_portal_app ローカル（app/data/）」の固定パス。
+# Storages（共通ストレージ）配下に置くログは、common_lib の正本APIで別途解決する。
 APP_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = APP_ROOT / "data"
 USERS_FILE = DATA_DIR / "users.json"

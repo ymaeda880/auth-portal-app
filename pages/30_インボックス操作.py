@@ -270,6 +270,8 @@ from common_lib.inbox.inbox_ui.table_view import (
 #from lib.inbox_preview.preview import render_preview
 from common_lib.inbox.inbox_ui.preview import render_preview
 
+from common_lib.ui.banner_lines import render_banner_line_by_key
+
 # ============================================================
 # 定数
 # ============================================================
@@ -323,6 +325,7 @@ def kind_label(kind: str) -> str:
 # Streamlit UI
 # ============================================================
 st.set_page_config(page_title="Inbox 検索・操作", page_icon="📥", layout="wide")
+render_banner_line_by_key("yellow_soft")
 st.title("📥 Inbox 検索・操作")
 
 sub = require_login(st)

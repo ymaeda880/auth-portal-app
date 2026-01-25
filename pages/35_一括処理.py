@@ -74,6 +74,7 @@ from common_lib.inbox.inbox_bulk.zip_ops import (
     build_zip_bytes_for_checked,
 )
 
+from common_lib.ui.banner_lines import render_banner_line_by_key
 
 # ============================================================
 # ✅ inbox_search（切り出し：検索系）
@@ -138,6 +139,7 @@ def kind_label(kind: str) -> str:
 # Streamlit UI
 # ============================================================
 st.set_page_config(page_title="Inbox 一括処理", page_icon="🧰", layout="wide")
+render_banner_line_by_key("yellow_soft")
 st.title("🧰 Inbox 一括処理（ZIP / 一括削除）")
 st.caption("※ ここではプレビューを行いません（last_viewed は更新しません）。")
 

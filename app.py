@@ -31,25 +31,28 @@ from lib.app.explanation import render_portal_usage_expander
 from common_lib.auth.config import COOKIE_NAME
 from common_lib.ui.ui_basics import thick_divider
 from common_lib.auth.jwt_utils import issue_jwt, verify_jwt
+from common_lib.ui.banner_lines import render_banner_line_by_key
 
 from lib.notices.db import notice_db_path
 from lib.notices.renderer import render_notices_block
 
 # --- sessions 共通ロジック ---
 from common_lib.sessions import SessionConfig, init_session, heartbeat_tick
+from common_lib.sessions.paths import resolve_sessions_db_path
+
 
 
 # ───────────────── 基本設定 ─────────────────
-st.set_page_config(page_title="Auth Portal", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="PAIS Portal", page_icon="🔐", layout="wide")
+# バナー（指定色）
+render_banner_line_by_key("yellow_soft")
+# ------------------------------------------------------------
+# セッション設定（Storages 正本 API 経由）
+# ------------------------------------------------------------
 
-# ------------------------------------------------------------
-# セッション設定（設計で確定した値）
-# ------------------------------------------------------------
-SESSIONS_DB = (
-    PROJECTS_ROOT / "Storages" / "_admin" / "sessions" / "sessions.db"
-)
+SESSIONS_DB = resolve_sessions_db_path(PROJECTS_ROOT)
+
 CFG = SessionConfig()  # heartbeat=30s, TTL=120s（既定）
-
 
 def _tick_sessions(user_sub: str | None) -> None:
     """
@@ -153,7 +156,7 @@ with st.sidebar:
 
         st.caption(
             "ログアウト後はリロードが必要ですが、そのままブラウザーを閉じてもOKです。"
-            "ログアウトしないでブラウザーを閉じた場合は，ログイン後8時間はログインが有効になっています．"
+            "ログアウトしないでブラウザーを閉じても問題ありません．その場合は，最初にログイン後8時間はログインが有効になっています．"
         )
     #else:
     #    st.info("未ログインです。サインインしてください。")

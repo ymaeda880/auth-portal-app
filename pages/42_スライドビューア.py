@@ -63,6 +63,8 @@ from common_lib.inbox.inbox_db.last_viewed_db import upsert_last_viewed
 # ✅ Inbox 一覧取得（並び替えを query_exec 側で行う）
 from common_lib.inbox.inbox_query.query_exec import query_items_page
 
+from common_lib.ui.banner_lines import render_banner_line_by_key
+
 PAGE_NAME = _THIS.stem
 PROJECTS_ROOT = MONO_ROOT
 
@@ -70,6 +72,7 @@ PROJECTS_ROOT = MONO_ROOT
 # page
 # ------------------------------------------------------------
 st.set_page_config(page_title="📑 スライドビューア", page_icon="📑", layout="wide")
+render_banner_line_by_key("yellow_soft")
 
 sub = require_login(st)
 if not sub:

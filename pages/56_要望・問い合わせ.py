@@ -24,15 +24,17 @@ if str(PROJECTS_ROOT) not in sys.path:
 
 from common_lib.auth.auth_helpers import require_login  # noqa: E402
 from common_lib.storage.external_ssd_root import resolve_storage_subdir_root  # noqa: E402
+from common_lib.ui.banner_lines import render_banner_line_by_key
 
 # ============================================================
 # Page
 # ============================================================
 st.set_page_config(
-    page_title="📮 要望・問い合わせ",
+    page_title="要望・問い合わせ",
     page_icon="📮",
     layout="wide",
 )
+render_banner_line_by_key("yellow_soft")
 
 # ============================================================
 # Storage & DB（正本：resolve_storage_subdir_root 方式に一本化）
@@ -68,7 +70,7 @@ def db_path(index_root: Path) -> Path:
 
 DB_PATH = db_path(index_root)
 
-st.info(f"root: {STORAGE_ROOT}")
+#st.info(f"root: {STORAGE_ROOT}")
 
 # ============================================================
 # DB

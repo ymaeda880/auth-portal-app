@@ -17,9 +17,11 @@ if str(PROJECTS_ROOT) not in sys.path:
 from common_lib.auth.jwt_utils import verify_jwt
 from common_lib.auth.config import COOKIE_NAME
 from lib.users import atomic_write_json  # 既存の users.json で使っていた原子的書込を再利用
+from common_lib.ui.banner_lines import render_banner_line_by_key
 
 # ===== ページ設定 =====
 st.set_page_config(page_title="ユーザー情報登録", page_icon="🪪", layout="centered")
+render_banner_line_by_key("yellow_soft")
 st.title("🪪 ユーザー情報の登録 / 変更")
 
 # ===== 保存ファイル（このアプリ直下の data/ を想定）=====

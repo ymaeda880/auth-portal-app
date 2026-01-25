@@ -3,37 +3,39 @@
 # ユーザー情報（users.json）の読み書きとログ追記
 # ─────────────────────────────────────────────────────────────
 from __future__ import annotations
-
 from pathlib import Path
-from typing import Any, Dict
+from typing import Dict, Any
 import json
 
-from .config import USERS_FILE
+from .config import USERS_FILE, LOGIN_LOG
 
-from common_lib.storage.storages_config import resolve_storages_root
+from pathlib import Path
+import json
+from typing import Dict, Any
 
+from common_lib.storage.external_ssd_root import resolve_storage_subdir_root
 
 # ============================================================
-# Login log path（設計メモ）
-#
-# ・auth_portal_app のログは「Storages/main 正本」にのみ書き込む
-# ・backup / external 判定はこのレイヤでは行わない
-# ・Storages のルート解決は resolve_storages_root() に集約する
-#
-# ※ main のルート分裂を防ぐため、直接 Path を組み立てない
+# Login log path（Storage abstraction 経由）
 # ============================================================
-
 _THIS = Path(__file__).resolve()
-PROJECTS_ROOT = _THIS.parents[3]   # .../projects
+PROJECTS_ROOT = _THIS.parents[3]   # projects/ 直下
 
-STORAGES_ROOT = resolve_storages_root(PROJECTS_ROOT)
+STORAGE_ROOT = resolve_storage_subdir_root(
+    PROJECTS_ROOT,
+    subdir="Storages",
+    role="main",
+)
 
 LOGIN_LOG = (
-    STORAGES_ROOT
+    STORAGE_ROOT
     / "logs"
     / "auth_portal_app"
     / "login_log.jsonl"
 )
+
+
+
 
 
 def load_users(path: Path = USERS_FILE) -> Dict[str, Any]:
