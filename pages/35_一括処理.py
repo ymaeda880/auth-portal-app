@@ -138,7 +138,7 @@ def kind_label(kind: str) -> str:
 # ============================================================
 # Streamlit UI
 # ============================================================
-st.set_page_config(page_title="Inbox 一括処理", page_icon="🧰", layout="wide")
+st.set_page_config(page_title="Portal", page_icon="🧰", layout="wide")
 render_banner_line_by_key("yellow_soft")
 st.title("🧰 Inbox 一括処理（ZIP / 一括削除）")
 st.caption("※ ここではプレビューを行いません（last_viewed は更新しません）。")

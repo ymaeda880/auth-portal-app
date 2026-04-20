@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pages/30_インボックス操作.py
+# auth_portal_app/pages/30_インボックス操作.py
 #
 # ✅ Inbox 検索・操作（20から分離）
 # - ①検索条件（種類/タグ/ファイル名/格納日/最終閲覧/サイズ）
@@ -324,7 +324,7 @@ def kind_label(kind: str) -> str:
 # ============================================================
 # Streamlit UI
 # ============================================================
-st.set_page_config(page_title="Inbox 検索・操作", page_icon="📥", layout="wide")
+st.set_page_config(page_title="Portal", page_icon="📥", layout="wide")
 render_banner_line_by_key("yellow_soft")
 st.title("📥 Inbox 検索・操作")
 
@@ -899,6 +899,7 @@ with left:
         on_change=_on_change_pick,
         label_visibility="collapsed",
         format_func=lambda _id: "",
+        #format_func=lambda _id: str(_id),
         index=None,  # ✅ これが「初期未選択」の要
     )
 

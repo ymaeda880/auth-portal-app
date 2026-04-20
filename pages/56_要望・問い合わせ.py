@@ -30,7 +30,7 @@ from common_lib.ui.banner_lines import render_banner_line_by_key
 # Page
 # ============================================================
 st.set_page_config(
-    page_title="要望・問い合わせ",
+    page_title="Portal",
     page_icon="📮",
     layout="wide",
 )
