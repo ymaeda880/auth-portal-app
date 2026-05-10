@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pages/35_一括処理.py
+# auth_portal_app/pages/35_一括処理.py
 #
 # ✅ Inbox 一括処理（A案：分離ページ）
 # - ① 格納（upload）は **無し**
@@ -112,6 +112,10 @@ from common_lib.inbox.inbox_ui.table_view import (
     render_html_table,
 )
 
+from lib.inbox_common.cleanup import (
+    get_stored_rel_for_item,
+    cleanup_empty_date_parents_after_delete,
+)
 
 # ============================================================
 # 定数
@@ -204,7 +208,7 @@ st.session_state.setdefault(K_ZIP_NAME, "inbox_selected.zip")
 # ============================================================
 c_title2, c_toggle2 = st.columns([2, 8], vertical_alignment="center")
 with c_title2:
-    st.subheader("① 検索")
+    st.subheader("検索")
 with c_toggle2:
     st.toggle("検索の詳細を表示", key=K_SEARCH_ADV_OPEN)
 
@@ -245,19 +249,56 @@ if bool(st.session_state.get(K_SEARCH_ADV_OPEN)):
     st.caption("詳細条件（種類・日付・最終閲覧・サイズ）")
     st.markdown("---")
 
-    # 種類
+    # ============================================================
+    # 種類：一括操作
+    # ============================================================
+    c_all1, c_all2, c_all3 = st.columns([1.5, 1.5, 6])
+
+    with c_all1:
+        if st.button("全てチェック", key="inbox35_kind_all_on"):
+            for k in ALL_KINDS:
+                st.session_state[K_KIND_FLAGS][k] = True
+                st.session_state[f"{K_KIND_FLAGS}_{k}"] = True
+
+            st.session_state[K_PAGE] = 0
+            st.session_state[K_CHECKED] = set()
+            st.rerun()
+
+    with c_all2:
+        if st.button("全てクリア", key="inbox35_kind_all_off"):
+            for k in ALL_KINDS:
+                st.session_state[K_KIND_FLAGS][k] = False
+                st.session_state[f"{K_KIND_FLAGS}_{k}"] = False
+
+            st.session_state[K_PAGE] = 0
+            st.session_state[K_CHECKED] = set()
+            st.rerun()
+
+    # ============================================================
+    # 種類：checkbox
+    # ============================================================
     c_k = st.columns(len(ALL_KINDS))
+
     for col, k in zip(c_k, ALL_KINDS):
         with col:
             st.checkbox(
                 kind_label(k),
                 key=f"{K_KIND_FLAGS}_{k}",
-                value=bool(st.session_state[K_KIND_FLAGS].get(k, True)),
+                #value=bool(st.session_state[K_KIND_FLAGS].get(k, True)),
             )
 
+    # ============================================================
+    # 種類：checkbox state を正本へ反映
+    # ============================================================
     for k in ALL_KINDS:
-        st.session_state[K_KIND_FLAGS][k] = bool(st.session_state.get(f"{K_KIND_FLAGS}_{k}", True))
-    kinds_checked = [k for k in ALL_KINDS if st.session_state[K_KIND_FLAGS].get(k, True)]
+        st.session_state[K_KIND_FLAGS][k] = bool(
+            st.session_state.get(f"{K_KIND_FLAGS}_{k}", True)
+        )
+
+    kinds_checked = [
+        k for k in ALL_KINDS if st.session_state[K_KIND_FLAGS].get(k, True)
+    ]
+
 
     # 格納日
     c3, c4 = st.columns([1, 1])
@@ -349,7 +390,57 @@ update_where_sig_and_maybe_clear_checked(
 # ② 一覧（checkbox）
 # ============================================================
 st.divider()
-st.subheader("② 一覧（チェックして一括処理）")
+st.subheader("一覧（チェックして一括処理）")
+
+# ============================================================
+# 並び替え条件
+# ============================================================
+K_SORT_DIR = "inbox35_sort_dir"
+K_SORT_KEY = "inbox35_sort_key"
+K_SORT_GROUP_KIND = "inbox35_sort_group_kind"
+
+st.session_state.setdefault(K_SORT_DIR, "降順")
+st.session_state.setdefault(K_SORT_KEY, "格納日")
+st.session_state.setdefault(K_SORT_GROUP_KIND, "種類別にしない")
+
+
+def _on_change_sort_options():
+    st.session_state[K_PAGE] = 0
+    st.session_state[K_CHECKED] = set()
+
+
+s1, s2, s3 = st.columns([1.2, 1.4, 1.8])
+
+with s1:
+    st.radio(
+        "並び順",
+        options=["降順", "昇順"],
+        key=K_SORT_DIR,
+        horizontal=True,
+        on_change=_on_change_sort_options,
+    )
+
+with s2:
+    st.radio(
+        "並び替え基準",
+        options=["格納日", "ファイル名"],
+        key=K_SORT_KEY,
+        horizontal=True,
+        on_change=_on_change_sort_options,
+    )
+
+with s3:
+    st.radio(
+        "種類別",
+        options=["種類別にしない", "種類別にする"],
+        key=K_SORT_GROUP_KIND,
+        horizontal=True,
+        on_change=_on_change_sort_options,
+    )
+
+sort_dir = "desc" if st.session_state[K_SORT_DIR] == "降順" else "asc"
+sort_key = "added_at" if st.session_state[K_SORT_KEY] == "格納日" else "original_name"
+sort_group_kind = st.session_state[K_SORT_GROUP_KIND] == "種類別にする"
 
 t1, t2, t3 = st.columns([1.2, 1.2, 7.6])
 with t1:
@@ -379,6 +470,9 @@ df_page, total0 = query_items_page(
     params=params,
     limit=PAGE_SIZE,
     offset=offset,
+    sort_key=sort_key,
+    sort_dir=sort_dir,
+    group_kind=sort_group_kind,
 )
 
 if total0 <= 0 or df_page.empty:
@@ -399,6 +493,9 @@ if page_index > last_page:
         params=params,
         limit=PAGE_SIZE,
         offset=offset,
+        sort_key=sort_key,
+        sort_dir=sort_dir,
+        group_kind=sort_group_kind,
     )
 
 c_nav1, c_nav2, c_nav3, c_nav4 = st.columns([1, 1, 3.2, 4.8])
@@ -582,7 +679,7 @@ if st.session_state.pop(K_DELETE_WORD_CLEAR, False):
 # ③ 一括操作（ZIP / 一括削除）
 # ============================================================
 st.divider()
-st.subheader("③ 一括操作（ZIP / 一括削除）")
+st.subheader("一括操作（ZIP / 一括削除）")
 
 checked_ids: Set[str] = set(st.session_state.get(K_CHECKED, set()))
 if not checked_ids:
@@ -670,11 +767,37 @@ if del_btn:
     ng: List[Tuple[str, str]] = []
 
     for _id in sorted(checked_ids):
-        ok, msg = delete_item_common(inbox_root=INBOX_ROOT, user_sub=sub, item_id=_id)
+        stored_rel = get_stored_rel_for_item(
+            items_db=items_db,
+            item_id=str(_id),
+        )
+
+        path_before_delete = None
+        if stored_rel:
+            path_before_delete = resolve_file_path(
+                INBOX_ROOT,
+                sub,
+                stored_rel,
+            )
+
+        ok, msg = delete_item_common(
+            inbox_root=INBOX_ROOT,
+            user_sub=sub,
+            item_id=_id,
+        )
+
         if ok:
             ok_count += 1
+
+            if path_before_delete is not None:
+                cleanup_empty_date_parents_after_delete(
+                    deleted_file_path=path_before_delete,
+                    user_root=paths["root"],
+                )
+
         else:
             ng.append((_id, msg))
+
 
     # 選択クリア（事故防止）
     st.session_state[K_CHECKED] = set()

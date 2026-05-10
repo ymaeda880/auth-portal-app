@@ -121,7 +121,7 @@ def render_preview(
     path = resolve_file_path(inbox_root, sub, str(selected["stored_rel"]))
 
     st.divider()
-    st.subheader("④ プレビュー")
+    st.subheader("プレビュー")
 
     if not path.exists():
         st.error("プレビュー対象ファイルが存在しません（不整合）。")

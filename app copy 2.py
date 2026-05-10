@@ -196,60 +196,12 @@ with right:
         st.session_state["show_login_form"] = True
 
 # ───────────────── ログインフォーム ─────────────────
-# if st.session_state.get("show_login_form"):
-#     c1, c2, c3 = st.columns([1, 1, 1])
-#     with c1:
-#         u = st.text_input("ユーザー名", key="login_username")
-#     with c2:
-#         p = st.text_input("パスワード", type="password", key="login_password")
-#     with c3:
-#         st.markdown("&nbsp;")
-#         if st.button("ログイン", use_container_width=True, key="btn_login"):
-#             rec = load_users().get("users", {}).get((u or "").strip())
-
-#             if not rec or not check_password_hash(rec.get("pw", ""), p or ""):
-#                 st.error("ユーザー名またはパスワードが違います。")
-#             else:
-#                 # JWT は username のみで発行（互換フォールバックあり）
-#                 try:
-#                     token, exp = issue_jwt(u)
-#                 except TypeError:
-#                     token, exp = issue_jwt(u, [])  # 旧シグネチャ対策
-
-#                 cm.set(COOKIE_NAME, token, expires_at=dt.datetime.fromtimestamp(exp), path="/")
-#                 st.session_state["current_user"] = u
-#                 st.session_state["show_login_form"] = False
-
-#                 append_login_log({
-#                     "ts": dt.datetime.now().isoformat(timespec="seconds"),
-#                     "user": u,
-#                     "event": "login",
-#                     "next": next_url,
-#                     "exp": exp
-#                 })
-#                 st.success("✅ ログインしました")
-
-#                 # ★ この run で確実に sessions 記録（次の rerun を待たない）
-#                 _tick_sessions(u)
-
-
-# ───────────────── ログインフォーム ─────────────────
 if st.session_state.get("show_login_form"):
     c1, c2, c3 = st.columns([1, 1, 1])
-
     with c1:
-        u = st.text_input(
-            "ユーザー名",
-            key="login_username",
-        )
-
+        u = st.text_input("ユーザー名", key="login_username")
     with c2:
-        p = st.text_input(
-            "パスワード",
-            type="password",
-            key="login_password",
-        )
-
+        p = st.text_input("パスワード", type="password", key="login_password")
     with c3:
         st.markdown("&nbsp;")
         if st.button("ログイン", use_container_width=True, key="btn_login"):
@@ -258,10 +210,11 @@ if st.session_state.get("show_login_form"):
             if not rec or not check_password_hash(rec.get("pw", ""), p or ""):
                 st.error("ユーザー名またはパスワードが違います。")
             else:
+                # JWT は username のみで発行（互換フォールバックあり）
                 try:
                     token, exp = issue_jwt(u)
                 except TypeError:
-                    token, exp = issue_jwt(u, [])
+                    token, exp = issue_jwt(u, [])  # 旧シグネチャ対策
 
                 cm.set(COOKIE_NAME, token, expires_at=dt.datetime.fromtimestamp(exp), path="/")
                 st.session_state["current_user"] = u
@@ -274,9 +227,11 @@ if st.session_state.get("show_login_form"):
                     "next": next_url,
                     "exp": exp
                 })
-
                 st.success("✅ ログインしました")
+
+                # ★ この run で確実に sessions 記録（次の rerun を待たない）
                 _tick_sessions(u)
+
 
 thick_divider(color="Blue", height=3, margin="1.5em 0")
 

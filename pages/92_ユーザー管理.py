@@ -1,4 +1,4 @@
-# pages/92_ユーザー管理.py
+# auth_portal_app/pages/92_ユーザー管理.py
 # ============================================================
 # 👑 Admin: User Access Viewer（管理者・制限アプリ許可・最終ログイン）
 # + 管理者: パスワードリセット／ユーザー削除（app.py から移設）
@@ -14,6 +14,7 @@ import json
 from io import BytesIO
 from pathlib import Path
 import sys
+import shutil
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -39,6 +40,8 @@ for p in (APP_ROOT, PROJ_ROOT, MONO_ROOT):
 from common_lib.auth.auth_helpers import require_admin_user
 from common_lib.auth.config import COOKIE_NAME
 from common_lib.storage.external_ssd_root import resolve_storage_subdir_root
+
+from common_lib.inbox.inbox_common.paths import resolve_inbox_root
 
 # ---------- 定数 ----------
 PAGE_TITLE = "👑 Admin: Access Viewer"
@@ -692,7 +695,7 @@ def main():
                     st.error(f"削除に失敗しました: {e}")
 
     # ─────────────────────────────────────────────────────
-    # 🗑️ ユーザー削除（管理者） — user_info.json からも削除
+    # 🗑️ ユーザー削除（管理者） — user_info.json / InBoxStorages / Storages 連動
     # ─────────────────────────────────────────────────────
     with st.expander("🗑️ ユーザー削除（管理者）", expanded=False):
         st.caption("⚠️ 削除は取り消せません。自分自身を削除すると即座にログアウトします。")
@@ -700,18 +703,102 @@ def main():
         input_user = st.text_input("削除するユーザー名を入力してください", key="admin_input_target")
         confirm = st.text_input("確認のため同じユーザー名をもう一度入力してください", key="admin_input_confirm")
 
+        st.markdown("---")
+        st.caption("追加削除オプション（必要な場合だけチェックしてください）")
+
+        delete_inbox_dir = st.checkbox(
+            "InBoxStorages/<user> も削除する",
+            value=False,
+            key="admin_delete_inbox_dir",
+        )
+
+        delete_storage_dir = st.checkbox(
+            "Storages/<user> も削除する",
+            value=False,
+            key="admin_delete_storage_dir",
+        )
+
+        confirm_delete_files = ""
+        if delete_inbox_dir or delete_storage_dir:
+            st.warning("⚠️ チェックしたユーザーデータフォルダは完全削除されます。復元できません。")
+            confirm_delete_files = st.text_input(
+                "フォルダ削除も行う場合は DELETE と入力してください",
+                key="admin_delete_files_confirm_word",
+            )
+
+        inbox_user_dir = None
+        storage_user_dir = None
+
+        if input_user:
+            try:
+                inbox_root = resolve_inbox_root(PROJECTS_ROOT)
+                inbox_user_dir = inbox_root / input_user
+            except Exception as e:
+                st.error(f"InBoxStorages の解決に失敗しました：{e}")
+
+            if STORAGE_ROOT is None:
+                st.error("Storages の解決に失敗しているため、Storages/<user> は削除できません。")
+            else:
+                storage_user_dir = STORAGE_ROOT / input_user
+
+            if delete_inbox_dir and inbox_user_dir is not None:
+                st.caption(f"削除予定 InBoxStorages: {inbox_user_dir}")
+
+            if delete_storage_dir and storage_user_dir is not None:
+                st.caption(f"削除予定 Storages: {storage_user_dir}")
+
+        def _is_safe_child_path(parent: Path, child: Path) -> bool:
+            try:
+                parent_resolved = parent.resolve()
+                child_resolved = child.resolve()
+                return child_resolved != parent_resolved and child_resolved.is_relative_to(parent_resolved)
+            except Exception:
+                return False
+
         if st.button("💥 完全に削除する", key="btn_admin_delete_user"):
             if not input_user or not confirm:
                 st.warning("ユーザー名を2回入力してください。")
             elif input_user != confirm:
                 st.error("確認入力が一致しません。")
+            elif (delete_inbox_dir or delete_storage_dir) and confirm_delete_files != "DELETE":
+                st.error("フォルダ削除を行う場合は、確認欄に DELETE と入力してください。")
             else:
                 db_local = load_users()
                 users_local = db_local.get("users", {})
+
                 if input_user not in users_local:
                     st.error(f"指定されたユーザーは存在しません：{input_user}")
                 else:
                     try:
+                        deleted_paths: List[str] = []
+
+                        if delete_inbox_dir:
+                            inbox_root = resolve_inbox_root(PROJECTS_ROOT)
+                            inbox_user_dir = inbox_root / input_user
+
+                            if not _is_safe_child_path(inbox_root, inbox_user_dir):
+                                st.error(f"InBoxStorages の削除対象パスが不正です：{inbox_user_dir}")
+                                st.stop()
+
+                            if inbox_user_dir.exists():
+                                shutil.rmtree(inbox_user_dir)
+                                deleted_paths.append(str(inbox_user_dir))
+
+                        if delete_storage_dir:
+                            if STORAGE_ROOT is None:
+                                st.error("Storages の解決に失敗しているため、Storages/<user> は削除できません。")
+                                st.stop()
+
+                            storage_user_dir = STORAGE_ROOT / input_user
+
+                            if not _is_safe_child_path(STORAGE_ROOT, storage_user_dir):
+                                st.error(f"Storages の削除対象パスが不正です：{storage_user_dir}")
+                                st.stop()
+
+                            if storage_user_dir.exists():
+                                shutil.rmtree(storage_user_dir)
+                                deleted_paths.append(str(storage_user_dir))
+
                         users_local.pop(input_user, None)
                         db_local["users"] = users_local
                         atomic_write_json(USERS_FILE, db_local)
@@ -722,8 +809,12 @@ def main():
 
                         st.success(f"ユーザーを削除しました：{input_user}")
 
+                        if deleted_paths:
+                            st.caption("削除したユーザーデータフォルダ:")
+                            for p in deleted_paths:
+                                st.code(p)
+
                         if input_user == admin_user:
-                            # 自分を消した場合はCookieを消してログアウト相当
                             cm = stx.CookieManager(key="cm_admin_access_fallback")
                             try:
                                 cm.delete(COOKIE_NAME)
@@ -734,6 +825,71 @@ def main():
 
                     except Exception as e:
                         st.error(f"削除に失敗しました：{e}")
+
+    # ─────────────────────────────────────────────────────
+    # 🔑 パスワード強制変更（管理者）
+    # ─────────────────────────────────────────────────────
+    with st.expander("🔑 パスワード強制変更（管理者）", expanded=False):
+        st.caption(
+            "ユーザーがパスワードを忘れた場合に、管理者が仮パスワードへ強制変更します。"
+            " 保存時は平文ではなくハッシュ化されます。"
+        )
+
+        target_user = st.text_input(
+            "パスワードを変更するユーザー名",
+            key="admin_pw_reset_target_user",
+        )
+
+        new_pw1 = st.text_input(
+            "新しい仮パスワード",
+            type="password",
+            key="admin_pw_reset_new_pw1",
+        )
+
+        new_pw2 = st.text_input(
+            "新しい仮パスワード（再入力）",
+            type="password",
+            key="admin_pw_reset_new_pw2",
+        )
+
+        confirm_user = st.text_input(
+            "確認のため、対象ユーザー名をもう一度入力してください",
+            key="admin_pw_reset_confirm_user",
+        )
+
+        if target_user == admin_user and target_user:
+            st.warning("自分自身のパスワードを変更しようとしています。実行後は新しいパスワードでログインしてください。")
+
+        if st.button("🔑 パスワードを強制変更する", key="btn_admin_force_change_pw"):
+            if not target_user or not confirm_user:
+                st.warning("対象ユーザー名を2回入力してください。")
+            elif target_user != confirm_user:
+                st.error("対象ユーザー名と確認入力が一致しません。")
+            elif not new_pw1 or not new_pw2:
+                st.warning("新しい仮パスワードを2回入力してください。")
+            elif new_pw1 != new_pw2:
+                st.error("新しい仮パスワードが一致しません。")
+            else:
+                db_local = load_users()
+                users_local = db_local.get("users", {})
+
+                if target_user not in users_local:
+                    st.error(f"指定されたユーザーは存在しません：{target_user}")
+                else:
+                    try:
+                        rec = users_local[target_user]
+                        rec["pw"] = generate_password_hash(new_pw1)
+
+                        users_local[target_user] = rec
+                        db_local["users"] = users_local
+
+                        atomic_write_json(USERS_FILE, db_local)
+
+                        st.success(f"パスワードを強制変更しました：{target_user}")
+                        st.info("仮パスワードを本人に伝え、ログイン後に本人がパスワード変更する運用にしてください。")
+
+                    except Exception as e:
+                        st.error(f"パスワード変更に失敗しました：{e}")
 
 
 if __name__ == "__main__":
