@@ -32,7 +32,7 @@ def resolve_selected_item(
     # 未選択チェック
     # ------------------------------------------------------------
     if not selected_id:
-        st.info("表示したい行を左のラジオで選択してください。")
+        st.info("表示したいファイルを「一覧」の左端のラジオボタンで選択してください。")
         st.stop()
 
     # ------------------------------------------------------------
@@ -41,7 +41,7 @@ def resolve_selected_item(
     hit = df_page[df_page["item_id"].astype(str) == str(selected_id)]
 
     if hit.empty:
-        st.info("左のラジオで選択してください。")
+        st.info("「一覧」の左端のラジオボタンで選択してください。")
         st.stop()
 
     selected = hit.iloc[0].to_dict()

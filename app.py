@@ -1,4 +1,4 @@
-# app.py（auth_portal_app）
+# auth_portal_app/app.py（auth_portal_app）
 from __future__ import annotations
 import datetime as dt
 from pathlib import Path
