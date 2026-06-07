@@ -31,8 +31,8 @@ def render_page_thumb_grid(
     max_items: int = 10,
     per_row: int = 5,
 ) -> None:
-    st.divider()
-    st.subheader(title)
+    #st.divider()
+    #st.subheader(title)
 
     page_rows_for_thumbs: List[Dict[str, Any]] = df_page.to_dict(orient="records")
 

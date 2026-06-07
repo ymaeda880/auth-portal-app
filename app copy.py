@@ -1,4 +1,4 @@
-# app.py（auth_portal_app）
+# auth_portal_app/app.py（auth_portal_app）
 from __future__ import annotations
 import datetime as dt
 from pathlib import Path
@@ -13,6 +13,7 @@ if str(PROJECTS_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECTS_ROOT))
 
 APP_ROOT = Path(__file__).resolve().parent  # auth_portal_app ディレクトリ
+APP_NAME = APP_ROOT.name
 
 
 import streamlit as st
@@ -30,42 +31,76 @@ from lib.app.explanation import render_portal_usage_expander
 from common_lib.auth.config import COOKIE_NAME
 from common_lib.ui.ui_basics import thick_divider
 from common_lib.auth.jwt_utils import issue_jwt, verify_jwt
-
+from common_lib.ui.banner_lines import render_banner_line_by_key
 
 from lib.notices.db import notice_db_path
 from lib.notices.renderer import render_notices_block
 
 # --- sessions 共通ロジック ---
-from common_lib.sessions import (
-    SessionConfig,
-    init_session,
-    heartbeat_tick,
-)
+from common_lib.sessions import SessionConfig, init_session, heartbeat_tick
+from common_lib.sessions.paths import resolve_sessions_db_path
+
 
 
 # ───────────────── 基本設定 ─────────────────
-st.set_page_config(page_title="Auth Portal", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="PAIS Portal", page_icon="🔐", layout="wide")
+# バナー（指定色）
+render_banner_line_by_key("yellow_soft")
+# ------------------------------------------------------------
+# セッション設定（Storages 正本 API 経由）
+# ------------------------------------------------------------
 
-# ------------------------------------------------------------
-# セッション設定（設計で確定した値）
-# ------------------------------------------------------------
-SESSION_CFG = SessionConfig(
-    app_name="command_station_app",# ★ 確定：識別子
-)
+SESSIONS_DB = resolve_sessions_db_path(PROJECTS_ROOT)
 
-# ------------------------------------------------------------
-# セッション初期化（初回のみ）
-# ------------------------------------------------------------
-init_session(cfg=SESSION_CFG)
+CFG = SessionConfig()  # heartbeat=30s, TTL=120s（既定）
 
-# ------------------------------------------------------------
-# heartbeat（30秒ごと）
-# Streamlit 再実行時に軽量に呼ばれる
-# ------------------------------------------------------------
-heartbeat_tick(cfg=SESSION_CFG)
+def _tick_sessions(user_sub: str | None) -> None:
+    """
+    auth_portal はログイン前後で user が変わるため、
+    「ログイン済みのときだけ」sessions を更新する。
+    """
+    if not user_sub:
+        return
+    init_session(db_path=SESSIONS_DB, cfg=CFG, user_sub=user_sub, app_name=APP_NAME)
+    heartbeat_tick(db_path=SESSIONS_DB, cfg=CFG, user_sub=user_sub, app_name=APP_NAME)
 
 
-st.title("🔐 ポータル")
+def render_pais_header(
+    logo_relpath: str = "assets/logo_chick.png",
+    logo_px: int = 120,
+) -> None:
+    logo_path = Path(logo_relpath)
+
+    # 左を太めにしてロゴを主役に
+    c1, c2 = st.columns([4, 12], vertical_alignment="center")
+
+    with c1:
+        if logo_path.is_file():
+            st.image(str(logo_path), width=logo_px)  # use_container_width は使わない
+        else:
+            st.write("🐤")
+
+    with c2:
+        # タイトルを「明示的に2段」で描画
+        st.markdown(
+            """
+            <div style="line-height:1.15; margin:0; padding:0;">
+              <h1 style="margin:0; padding:0;">
+                プレックAIシステム
+              </h1>
+              <h2 style="margin:6px 0 0 0; padding:0; font-weight:600;">
+                （PAIS）ポータル
+              </h2>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# 呼び出し
+render_pais_header()
+
+
+#st.title("🔐 プレックAIシステム（PAIS）ポータル")
 
 # ここで説明 expander を表示
 render_portal_usage_expander()
@@ -103,6 +138,9 @@ if payload and "current_user" not in st.session_state:
     st.session_state["current_user"] = payload.get("sub")
 user = st.session_state.get("current_user")
 
+# ★ ログイン済みならここで sessions 更新（JWT復元のケースも含む）
+_tick_sessions(user)
+
 # ───────────────── サイドバー：アカウント操作 ─────────────────
 with st.sidebar:
     #st.markdown("### 🔐 アカウント操作")
@@ -118,7 +156,7 @@ with st.sidebar:
 
         st.caption(
             "ログアウト後はリロードが必要ですが、そのままブラウザーを閉じてもOKです。"
-            "ログアウトしないでブラウザーを閉じた場合は，ログイン後8時間はログインが有効になっています．"
+            "ログアウトしないでブラウザーを閉じても問題ありません．その場合は，最初にログイン後8時間はログインが有効になっています．"
         )
     #else:
     #    st.info("未ログインです。サインインしてください。")
@@ -158,12 +196,60 @@ with right:
         st.session_state["show_login_form"] = True
 
 # ───────────────── ログインフォーム ─────────────────
+# if st.session_state.get("show_login_form"):
+#     c1, c2, c3 = st.columns([1, 1, 1])
+#     with c1:
+#         u = st.text_input("ユーザー名", key="login_username")
+#     with c2:
+#         p = st.text_input("パスワード", type="password", key="login_password")
+#     with c3:
+#         st.markdown("&nbsp;")
+#         if st.button("ログイン", use_container_width=True, key="btn_login"):
+#             rec = load_users().get("users", {}).get((u or "").strip())
+
+#             if not rec or not check_password_hash(rec.get("pw", ""), p or ""):
+#                 st.error("ユーザー名またはパスワードが違います。")
+#             else:
+#                 # JWT は username のみで発行（互換フォールバックあり）
+#                 try:
+#                     token, exp = issue_jwt(u)
+#                 except TypeError:
+#                     token, exp = issue_jwt(u, [])  # 旧シグネチャ対策
+
+#                 cm.set(COOKIE_NAME, token, expires_at=dt.datetime.fromtimestamp(exp), path="/")
+#                 st.session_state["current_user"] = u
+#                 st.session_state["show_login_form"] = False
+
+#                 append_login_log({
+#                     "ts": dt.datetime.now().isoformat(timespec="seconds"),
+#                     "user": u,
+#                     "event": "login",
+#                     "next": next_url,
+#                     "exp": exp
+#                 })
+#                 st.success("✅ ログインしました")
+
+#                 # ★ この run で確実に sessions 記録（次の rerun を待たない）
+#                 _tick_sessions(u)
+
+
+# ───────────────── ログインフォーム ─────────────────
 if st.session_state.get("show_login_form"):
     c1, c2, c3 = st.columns([1, 1, 1])
+
     with c1:
-        u = st.text_input("ユーザー名", key="login_username")
+        u = st.text_input(
+            "ユーザー名",
+            key="login_username",
+        )
+
     with c2:
-        p = st.text_input("パスワード", type="password", key="login_password")
+        p = st.text_input(
+            "パスワード",
+            type="password",
+            key="login_password",
+        )
+
     with c3:
         st.markdown("&nbsp;")
         if st.button("ログイン", use_container_width=True, key="btn_login"):
@@ -172,11 +258,10 @@ if st.session_state.get("show_login_form"):
             if not rec or not check_password_hash(rec.get("pw", ""), p or ""):
                 st.error("ユーザー名またはパスワードが違います。")
             else:
-                # JWT は username のみで発行（互換フォールバックあり）
                 try:
                     token, exp = issue_jwt(u)
                 except TypeError:
-                    token, exp = issue_jwt(u, [])  # 旧シグネチャ対策
+                    token, exp = issue_jwt(u, [])
 
                 cm.set(COOKIE_NAME, token, expires_at=dt.datetime.fromtimestamp(exp), path="/")
                 st.session_state["current_user"] = u
@@ -189,8 +274,9 @@ if st.session_state.get("show_login_form"):
                     "next": next_url,
                     "exp": exp
                 })
-                st.success("✅ ログインしました")
 
+                st.success("✅ ログインしました")
+                _tick_sessions(u)
 
 thick_divider(color="Blue", height=3, margin="1.5em 0")
 
@@ -296,5 +382,3 @@ with st.expander("🔑 パスワード変更（本人）", expanded=False):
                 db["users"][user] = rec
                 atomic_write_json(USERS_FILE, db)
                 st.success("パスワードを変更しました。")
-
-

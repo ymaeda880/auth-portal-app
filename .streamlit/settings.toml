@@ -33,8 +33,8 @@ apps = [
 [access.admin]
 apps = [
     "command_station",  # サーバー制御・Nginx操作
-    "doc_manager",      # PDF整理・OCR
-    "auth_portal",      # 認証管理そのもの
+    #"doc_manager",      # PDF整理・OCR
+    #"auth_portal",      # 認証管理そのもの
 ]
 
 # -------------------------------
@@ -48,3 +48,9 @@ users = ["maeda", "admin", "t-okamoto", "y-maeda", "h-maeda"]
 # -------------------------------
 [restricted_users]
 login_test = ["maeda", "y-maeda", "admin"]
+
+
+
+[ui]
+banner_key = "yellow_soft"
+

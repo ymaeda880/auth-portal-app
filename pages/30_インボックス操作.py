@@ -23,6 +23,8 @@ PROJECTS_ROOT = _THIS.parents[3]
 if str(PROJECTS_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECTS_ROOT))
 
+APP_DIR = APP_ROOT
+
 
 # ============================================================
 # 認証
@@ -95,6 +97,16 @@ from common_lib.inbox.inbox_ui.preview import render_preview
 # 共通UI
 # ============================================================
 from common_lib.ui.banner_lines import render_banner_line_by_key
+from common_lib.env.config import get_ui_banner_key_from_app_settings
+from common_lib.ui.ui_basics import subtitle  # type: ignore
+
+# ===========================================================
+# lib（説明UI）
+# ============================================================
+from lib.explanation.exp_inbox import (
+	   render_inbox_page_intro,
+    render_inbox_help_expander,
+)
 
 # ============================================================
 # app/lib 側 UI 部品
@@ -137,11 +149,15 @@ def kind_label(kind: str) -> str:
 
 
 # ============================================================
-# Streamlit UI
+# Streamlit UI（バナー・タイトル）
 # ============================================================
-st.set_page_config(page_title="Portal", page_icon="📥", layout="wide")
-render_banner_line_by_key("yellow_soft")
+st.set_page_config(page_title="Portal / inBox", page_icon="📥", layout="wide")
+
+banner_key = get_ui_banner_key_from_app_settings(APP_DIR)
+render_banner_line_by_key(banner_key)
+
 st.title("📥 Inbox 検索・操作")
+subtitle("パーソナルファイル倉庫 ✨ ファイルの管理を単純に")
 
 sub = require_login(st)
 if not sub:
@@ -150,6 +166,10 @@ if not sub:
 if not INBOX_ROOT.exists():
     st.error(f"InBoxStorages のルートが存在しません: {INBOX_ROOT}")
     st.stop()
+
+# ============================================================
+# パス設定
+# ============================================================  
 
 paths = ensure_user_dirs(INBOX_ROOT, sub)
 
@@ -165,13 +185,31 @@ ensure_last_viewed_db(lv_db)
 quota = quota_bytes_for_user(sub)
 usage = folder_size_bytes(paths["root"])
 
+
+# ============================================================
+# ログイン
+# ============================================================
 left, right = st.columns([2, 1])
 with left:
     st.info(f"現在の使用量: {bytes_human(usage)} / 上限: {bytes_human(quota)}")
 with right:
     st.success(f"✅ ログイン中: **{sub}**")
 
-st.caption(f"保存先: {paths['root']}")
+#st.caption(f"保存先: {paths['root']}")
+
+
+# ============================================================
+# ページ説明
+# ============================================================
+render_inbox_page_intro()
+
+# ============================================================
+# ヘルプ
+# ============================================================
+render_inbox_help_expander(
+    banner_key=banner_key,
+)
+
 
 # ============================================================
 # セッションキー
@@ -216,7 +254,7 @@ def render_upload_area() -> None:
     c_title, c_toggle = st.columns([2, 8], vertical_alignment="center")
 
     with c_title:
-        st.subheader("格納")
+        st.subheader("① 格納")
 
     with c_toggle:
         st.toggle(
@@ -380,7 +418,7 @@ render_upload_area()
 c_title2, c_toggle2 = st.columns([2, 8], vertical_alignment="center")
 
 with c_title2:
-    st.subheader("検索")
+    st.subheader("② 検索")
 
 with c_toggle2:
     st.toggle(
@@ -602,7 +640,7 @@ where_sql, params = build_where_and_params(
 # ③ 一覧
 # ============================================================
 st.divider()
-st.subheader("一覧")
+st.subheader("③ 一覧")
 
 # ============================================================
 # 並び替え条件
@@ -823,6 +861,8 @@ with right:
 # ============================================================
 # ④ サムネ一覧
 # ============================================================
+st.divider()
+st.subheader("④ サムネ一覧")
 render_page_thumb_grid(
     inbox_root=INBOX_ROOT,
     sub=sub,
@@ -847,6 +887,10 @@ def _on_deleted_item():
     st.rerun()
 
 
+st.divider()
+st.subheader("⑤ 操作（ダウンロード / タグ変更 / 削除）")
+#st.caption("※ download は last_viewed を更新しません。")
+
 render_item_actions(
     inbox_root=INBOX_ROOT,
     sub=sub,
@@ -862,6 +906,7 @@ render_item_actions(
 # ============================================================
 # ⑥ プレビュー
 # ============================================================
+st.subheader("⑥ プレビュー")
 render_preview(
     inbox_root=INBOX_ROOT,
     sub=sub,

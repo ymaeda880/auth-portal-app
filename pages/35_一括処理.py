@@ -75,6 +75,8 @@ from common_lib.inbox.inbox_bulk.zip_ops import (
 )
 
 from common_lib.ui.banner_lines import render_banner_line_by_key
+from common_lib.ui.ui_basics import subtitle  # type: ignore
+from common_lib.env.config import get_ui_banner_key_from_app_settings
 
 # ============================================================
 # ✅ inbox_search（切り出し：検索系）
@@ -118,6 +120,14 @@ from lib.inbox_common.cleanup import (
 )
 
 # ============================================================
+# 説明UI
+# ============================================================
+from lib.explanation.exp_inbox_bulk import (
+    render_inbox_bulk_page_intro,
+    render_inbox_bulk_help_expander,
+)
+
+# ============================================================
 # 定数
 # ============================================================
 JST = timezone(timedelta(hours=9))
@@ -143,9 +153,13 @@ def kind_label(kind: str) -> str:
 # Streamlit UI
 # ============================================================
 st.set_page_config(page_title="Portal", page_icon="🧰", layout="wide")
-render_banner_line_by_key("yellow_soft")
-st.title("🧰 Inbox 一括処理（ZIP / 一括削除）")
-st.caption("※ ここではプレビューを行いません（last_viewed は更新しません）。")
+banner_key = get_ui_banner_key_from_app_settings(APP_ROOT)
+render_banner_line_by_key(banner_key)
+st.title("🧰 Inbox 一括処理")
+subtitle(
+    "ファイルを複数選択して一括処理"
+)
+#st.caption("※ ここではプレビューを行いません（last_viewed は更新しません）。")
 
 sub = require_login(st)
 if not sub:
@@ -169,7 +183,20 @@ with cL:
     st.info(f"現在の使用量: {bytes_human(usage)} / 上限: {bytes_human(quota)}")
 with cR:
     st.success(f"✅ ログイン中: **{sub}**")
-st.caption(f"保存先: {paths['root']}")
+#st.caption(f"保存先: {paths['root']}")
+
+
+# ============================================================
+# ページ説明
+# ============================================================
+render_inbox_bulk_page_intro()
+
+# ============================================================
+# ヘルプ
+# ============================================================
+render_inbox_bulk_help_expander(
+    banner_key=banner_key,
+)
 
 # ============================================================
 # session keys
@@ -208,7 +235,7 @@ st.session_state.setdefault(K_ZIP_NAME, "inbox_selected.zip")
 # ============================================================
 c_title2, c_toggle2 = st.columns([2, 8], vertical_alignment="center")
 with c_title2:
-    st.subheader("検索")
+    st.subheader("① 検索")
 with c_toggle2:
     st.toggle("検索の詳細を表示", key=K_SEARCH_ADV_OPEN)
 
@@ -390,7 +417,7 @@ update_where_sig_and_maybe_clear_checked(
 # ② 一覧（checkbox）
 # ============================================================
 st.divider()
-st.subheader("一覧（チェックして一括処理）")
+st.subheader("② 一覧")
 
 # ============================================================
 # 並び替え条件
@@ -679,7 +706,7 @@ if st.session_state.pop(K_DELETE_WORD_CLEAR, False):
 # ③ 一括操作（ZIP / 一括削除）
 # ============================================================
 st.divider()
-st.subheader("一括操作（ZIP / 一括削除）")
+st.subheader("③ 一括操作")
 
 checked_ids: Set[str] = set(st.session_state.get(K_CHECKED, set()))
 if not checked_ids:

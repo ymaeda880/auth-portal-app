@@ -1,145 +1,296 @@
-# pages/03_ユーザー情報登録.py
+# -*- coding: utf-8 -*-
+# auth_portal_app/pages/03_ユーザー情報登録.py
+# ============================================================
+# ユーザー情報登録
+#
+# 機能：
+# - ログイン中ユーザーの基本情報を登録・変更する
+# - 姓・名・メールアドレス・部署を保存する
+# - data/user_info.json にユーザー単位で保存する
+# ============================================================
+
 from __future__ import annotations
+
+# ============================================================
+# imports
+# ============================================================
 from pathlib import Path
 import sys
 import json
 import datetime as dt
 
 import streamlit as st
-import extra_streamlit_components as stx
 
-# === プロジェクト共通パス解決（上位の common_lib を import 可能に） ===
-PROJECTS_ROOT = Path(__file__).resolve().parents[2]  # apps/<this_app>/pages/..
+# ============================================================
+# sys.path 調整
+# ============================================================
+_THIS = Path(__file__).resolve()
+APP_ROOT = _THIS.parents[1]
+PROJECTS_ROOT = _THIS.parents[3]
+APP_DIR = APP_ROOT
+
 if str(PROJECTS_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECTS_ROOT))
 
-# 共通ライブラリ（Auth/JWT, Cookie名, 原子的JSON書込）
-from common_lib.auth.jwt_utils import verify_jwt
-from common_lib.auth.config import COOKIE_NAME
-from lib.users import atomic_write_json  # 既存の users.json で使っていた原子的書込を再利用
+# ============================================================
+# 認証
+# ============================================================
+from common_lib.auth.auth_helpers import require_login
+
+# ============================================================
+# 共通UI
+# ============================================================
 from common_lib.ui.banner_lines import render_banner_line_by_key
+from common_lib.env.config import get_ui_banner_key_from_app_settings
+from common_lib.ui.ui_basics import subtitle  # type: ignore
 
-# ===== ページ設定 =====
-st.set_page_config(page_title="Portal", page_icon="🪪", layout="centered")
-render_banner_line_by_key("yellow_soft")
-st.title("🪪 ユーザー情報の登録 / 変更")
+# ============================================================
+# JSON保存
+# ============================================================
+from lib.users import atomic_write_json
 
-# ===== 保存ファイル（このアプリ直下の data/ を想定）=====
-USER_INFO_FILE = Path("data/user_info.json")
-USER_INFO_FILE.parent.mkdir(parents=True, exist_ok=True)
+# ============================================================
+# 説明UI
+# ============================================================
+from lib.explanation.exp_userinfo import (
+    render_userinfo_page_intro,
+    render_userinfo_help_expander,
+)
 
-# ===== 既存データの読み込み =====
+
+# ============================================================
+# 定数
+# ============================================================
+USER_INFO_FILE = APP_ROOT / "data" / "user_info.json"
+
+DEPARTMENTS = [
+    "総務部",
+    "経理部",
+    "企画開発部",
+    "新規事業開発室",
+    "環境調査部",
+    "環境計画部",
+    "都市・地域計画部",
+    "歴史・文化計画部",
+    "環境設計部",
+    "その他",
+]
+
+# ============================================================
+# セッションキー
+# ============================================================
+K_LAST_NAME = "userinfo_last_name"
+K_FIRST_NAME = "userinfo_first_name"
+K_EMAIL = "userinfo_email"
+K_DEPT = "userinfo_department"
+K_DEPT_OTHER = "userinfo_department_other"
+
+
+# ============================================================
+# ユーザー情報DB 読み込み
+# ============================================================
 def load_user_info_db() -> dict:
     if USER_INFO_FILE.exists():
         try:
             return json.loads(USER_INFO_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return {"users": {}}  # スキーマ: {"users": {"<username>": {...}}}
 
-def save_user_info_db(db: dict) -> None:
+    return {"users": {}}
+
+
+# ============================================================
+# ユーザー情報DB 保存
+# ============================================================
+def save_user_info_db(
+    db: dict,
+) -> None:
+    USER_INFO_FILE.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(USER_INFO_FILE, db)
 
-# ===== ログインユーザーの特定 =====
-def get_current_username() -> str | None:
-    # 1) セッションの復元
-    if "current_user" in st.session_state and st.session_state["current_user"]:
-        return st.session_state["current_user"]
 
-    # 2) Cookie から JWT 検証
-    cm = stx.CookieManager(key="cm_userinfo")
-    token = cm.get(COOKIE_NAME)
-    payload = verify_jwt(token)
-    if payload:
-        user = payload.get("sub")
-        if user:
-            st.session_state["current_user"] = user
-            return user
-    return None
+# ============================================================
+# Streamlit UI（バナー・タイトル）
+# ============================================================
+st.set_page_config(
+    page_title="Portal / ユーザー情報登録",
+    page_icon="🪪",
+    layout="wide",
+)
 
-username = get_current_username()
+banner_key = get_ui_banner_key_from_app_settings(APP_DIR)
+render_banner_line_by_key(banner_key)
+
+# ============================================================
+# ログイン
+# ============================================================
+username = require_login(st)
 if not username:
-    st.error("未ログインです。ポータルでサインインしてください。")
     st.stop()
 
-st.success(f"ログイン中ユーザー: **{username}**")
+# ============================================================
+# ログイン表示
+# ============================================================
+c_title, c_login = st.columns([3, 1.5])
 
-# ===== 部署の選択肢（必要に応じて増減可）=====
-DEPARTMENTS = [
-    "総務部", "経理部", "企画開発部", "新規事業開発室",
-    "環境調査部", "環境計画部", "都市・地域計画部", "歴史・文化計画部",
-    "環境設計部",
-    "その他"
-]
+with c_title:
+    st.title("🪪 ユーザー情報登録")
+    subtitle("ユーザー情報の登録・変更")
 
-# ===== 既存レコードの反映 =====
+with c_login:
+    st.success(f"✅ ログイン中: **{username}**")
+
+# ============================================================
+# ページ説明
+# ============================================================
+render_userinfo_page_intro()
+
+# ============================================================
+# ヘルプ
+# ============================================================
+render_userinfo_help_expander(
+    banner_key=banner_key,
+)
+
+# ============================================================
+# 既存データの読み込み
+# ============================================================
 db = load_user_info_db()
 record = (db.get("users") or {}).get(username) or {}
 
+# ============================================================
+# 既存値
+# ============================================================
+old_last = str(record.get("last_name", ""))
+old_first = str(record.get("first_name", ""))
+old_email = str(record.get("email", ""))
+old_dept = str(record.get("department", "その他"))
 
+# ============================================================
+# session_state 初期化
+# ============================================================
+st.session_state.setdefault(K_LAST_NAME, old_last)
+st.session_state.setdefault(K_FIRST_NAME, old_first)
+st.session_state.setdefault(K_EMAIL, old_email)
 
+if old_dept in DEPARTMENTS:
+    st.session_state.setdefault(K_DEPT, old_dept)
+    st.session_state.setdefault(K_DEPT_OTHER, "")
+else:
+    st.session_state.setdefault(K_DEPT, "その他")
+    st.session_state.setdefault(K_DEPT_OTHER, old_dept)
 
+# ============================================================
+# ① 現在登録されている内容
+# ============================================================
+st.subheader("① 現在登録されている内容")
 
-
-# ===== 既存レコードの表示（確認用）=====
-st.markdown("---")
-st.subheader("現在登録されている内容")
 current = (load_user_info_db().get("users") or {}).get(username)
+
 if current:
     st.json(current)
 else:
     st.info("まだ登録がありません。フォームから登録してください。")
-# 既存値
-old_last = record.get("last_name", "")
-old_first = record.get("first_name", "")
-old_email = record.get("email", "")
-old_dept = record.get("department", "その他")
 
-with st.form("user_info_form", clear_on_submit=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        last_name = st.text_input("姓", value=old_last, placeholder="山田")
-    with col2:
-        first_name = st.text_input("名", value=old_first, placeholder="太郎")
+# ============================================================
+# ② 登録 / 更新フォーム
+# ============================================================
+st.divider()
+st.subheader("② 登録 / 更新")
 
-    email = st.text_input("メールアドレス", value=old_email, placeholder="taro.yamada@example.com")
+col1, col2 = st.columns(2)
 
-    dept = st.selectbox(
-        "部署",
-        options=DEPARTMENTS,
-        index=DEPARTMENTS.index(old_dept) if old_dept in DEPARTMENTS else DEPARTMENTS.index("その他")
+with col1:
+    last_name = st.text_input(
+        "姓",
+        placeholder="山田",
+        key=K_LAST_NAME,
     )
-    dept_other = ""
-    if dept == "その他":
-        dept_other = st.text_input(
-            "部署（その他・自由入力）",
-            value=(old_dept if old_dept not in DEPARTMENTS else "")
-        )
 
-    submitted = st.form_submit_button("💾 登録 / 更新", use_container_width=True)
+with col2:
+    first_name = st.text_input(
+        "名",
+        placeholder="太郎",
+        key=K_FIRST_NAME,
+    )
 
-if submitted:
-    # 入力検証（必須）
-    if not last_name.strip() or not first_name.strip():
+email = st.text_input(
+    "メールアドレス",
+    placeholder="taro.yamada@example.com",
+    key=K_EMAIL,
+)
+
+dept = st.selectbox(
+    "部署",
+    options=DEPARTMENTS,
+    key=K_DEPT,
+)
+
+dept_other = ""
+
+if dept == "その他":
+    dept_other = st.text_input(
+        "部署（その他・自由入力）",
+        key=K_DEPT_OTHER,
+    )
+
+# ============================================================
+# ③ 保存
+# ============================================================
+st.divider()
+st.subheader("③ 保存")
+
+if st.button(
+    "💾 登録 / 更新",
+    key="userinfo_save_button",
+):
+    # ------------------------------------------------------------
+    # 入力値取得
+    # ------------------------------------------------------------
+    last_name_v = str(st.session_state.get(K_LAST_NAME, "")).strip()
+    first_name_v = str(st.session_state.get(K_FIRST_NAME, "")).strip()
+    email_v = str(st.session_state.get(K_EMAIL, "")).strip()
+    dept_v = str(st.session_state.get(K_DEPT, "その他")).strip()
+    dept_other_v = str(st.session_state.get(K_DEPT_OTHER, "")).strip()
+
+    # ------------------------------------------------------------
+    # 入力検証
+    # ------------------------------------------------------------
+    if not last_name_v or not first_name_v:
         st.error("姓と名を入力してください。")
-    elif not email.strip():
-        st.error("メールアドレスを入力してください。")
-    elif "@" not in email or "." not in email.split("@")[-1]:
-        st.error("メールアドレスの形式が正しくありません。")
-    else:
-        chosen_dept = dept_other.strip() if dept == "その他" and dept_other.strip() else dept
 
-        # 更新内容
+    elif not email_v:
+        st.error("メールアドレスを入力してください。")
+
+    elif "@" not in email_v or "." not in email_v.split("@")[-1]:
+        st.error("メールアドレスの形式が正しくありません。")
+
+    else:
+        # ------------------------------------------------------------
+        # 部署確定
+        # ------------------------------------------------------------
+        chosen_dept = dept_other_v if dept_v == "その他" and dept_other_v else dept_v
+
+        # ------------------------------------------------------------
+        # 保存レコード作成
+        # ------------------------------------------------------------
         new_record = {
-            "last_name": last_name.strip(),
-            "first_name": first_name.strip(),
-            "email": email.strip(),
+            "last_name": last_name_v,
+            "first_name": first_name_v,
+            "email": email_v,
             "department": chosen_dept,
             "updated_at": dt.datetime.now().isoformat(timespec="seconds"),
         }
+
+        # ------------------------------------------------------------
+        # 保存実行
+        # ------------------------------------------------------------
         db.setdefault("users", {})[username] = new_record
+
         try:
             save_user_info_db(db)
             st.success("ユーザー情報を保存しました。")
+            st.rerun()
+
         except Exception as e:
             st.error(f"保存に失敗しました: {e}")

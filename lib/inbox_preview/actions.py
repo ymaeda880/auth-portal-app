@@ -42,9 +42,9 @@ def render_item_actions(
         削除成功時に呼ばれるコールバック（ページ側で state リセット用）
     """
 
-    st.divider()
-    st.subheader("操作（ダウンロード / タグ変更 / 削除）")
-    st.caption("※ download は last_viewed を更新しません。")
+    #st.divider()
+    #st.subheader("操作（ダウンロード / タグ変更 / 削除）")
+    #st.caption("※ download は last_viewed を更新しません。")
 
     tag_disp = tag_from_json_1st(selected.get("tags_json") or "[]")
 

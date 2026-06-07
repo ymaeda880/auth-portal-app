@@ -29,14 +29,27 @@ SETTINGS_FILE = APP_ROOT / ".streamlit/settings.toml"
 
 APP_LABELS = {
     "bot":            "🤖 社内ボット（RAG）",
-    "minutes":        "📝 議事録ジェネレータ",
-    "image_maker":    "🎨 画像生成",
+    "minutes":        "📝 ミニッツメーカー",
+    #"minutes":        "📝 Minutes Maker",
+    "image_maker":    "🎨 イメージメーカー",
     "slide_viewer":   "📽️ スライドビューア",
     "login_test":     "🔐 ログインテスト",
     "command_station":"🛠️ コマンドステーション",
     "doc_manager":    "📚 文書整理・OCR",
     "auth_portal":    "🔐 認証ポータル",
-    "text_studio":    "🖍️ 文章校正",
+    "text_studio":    "🖍️ テキストスタジオ",
+}
+
+APP_CAPTIONS = {
+    "bot": "報告書検索・チャット",
+    "minutes": "議事録作成（minutes maker）",
+    "image_maker": "画像生成（image maker）",
+    "slide_viewer": "スライド閲覧",
+    "login_test": "ログイン確認",
+    "command_station": "運用管理",
+    "doc_manager": "文書整理・OCR",
+    "auth_portal": "認証管理",
+    "text_studio": "文書作成支援（text studio）",
 }
 
 APP_HELP = {
