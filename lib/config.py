@@ -38,6 +38,8 @@ APP_LABELS = {
     "doc_manager":    "📚 文書整理・OCR",
     "auth_portal":    "🔐 認証ポータル",
     "text_studio":    "🖍️ テキストスタジオ",
+    "project_hub":    "🗂️ プロジェクト・ハブ",
+	"rag_builder":    "🧠 ラグ・ビルダー",
 }
 
 APP_CAPTIONS = {
@@ -50,6 +52,8 @@ APP_CAPTIONS = {
     "doc_manager": "文書整理・OCR",
     "auth_portal": "認証管理",
     "text_studio": "文書作成支援（text studio）",
+    "project_hub":  "プロジェクト管理",
+	"rag_builder":  "RAGBot作成",
 }
 
 APP_HELP = {
@@ -61,5 +65,7 @@ APP_HELP = {
     "command_station":"Git/サービス操作など運用ツール",
     "doc_manager":    "PDF整理・OCR・ベクトル化",
     "auth_portal":    "ユーザー/権限/SSOの管理",
-    "text_studio":    "文章の校正"
+    "text_studio":    "文章の校正",
+    "project_hub":  "プロジェクトの管理",
+	"rag_builder":  "RAGBotの作成",
 }

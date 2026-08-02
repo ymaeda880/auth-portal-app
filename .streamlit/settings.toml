@@ -18,7 +18,8 @@ apps = [
     "bot",              # RAGチャットボット
     "minutes",          # 議事録生成アプリ
     "text_studio",      # 文書校正アプリ
-    "image_maker"       # 画像生成アプリ
+    "image_maker",       # 画像生成アプリ
+    "project_hub"       # プロジェクト管理
 ]
 
 # 許可された人のみ（restricted）
@@ -33,6 +34,7 @@ apps = [
 [access.admin]
 apps = [
     "command_station",  # サーバー制御・Nginx操作
+    "rag_builder",  # RAGBotの作成
     #"doc_manager",      # PDF整理・OCR
     #"auth_portal",      # 認証管理そのもの
 ]

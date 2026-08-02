@@ -63,6 +63,12 @@ pg = st.navigation(
                 url_path="top",
             ),
             st.Page("pages/03_ユーザー情報登録.py", title="ユーザー情報登録", icon="👤", url_path="03_user_info"),
+            st.Page(
+                "pages/110_ログイン.py",
+                title="ログイン",
+                icon="🔐",
+                url_path="110_login",
+            ),
         ],
 
         # "👤 ユーザー": [
@@ -87,6 +93,12 @@ pg = st.navigation(
 
         f"{NAV_PROCESS_ICON} 問い合わせ": [
             st.Page("pages/56_要望・問い合わせ.py", title="要望・問い合わせ", icon="📮", url_path="56_contact"),
+            st.Page(
+                "pages/65_社内アンケート.py",
+                title="社内アンケート",
+                icon="📝",
+                url_path="65_internal_survey",
+            ),
         ],
 
         f"{NAV_PORTAL_RETURN_ICON}": [
@@ -97,6 +109,12 @@ pg = st.navigation(
         f"{NAV_STOP_ICON} 管理者用": [
             st.Page("pages/88_告知管理.py", title="告知管理", icon="📢", url_path="88_notice_admin"),
             st.Page("pages/90_問い合わせ管理.py", title="問い合わせ管理", icon="📬", url_path="90_contact_admin"),
+            st.Page(
+                "pages/120_アンケート管理.py",
+                title="アンケート管理",
+                icon="📊",
+                url_path="120_survey_admin",
+            ),            
             st.Page("pages/92_ユーザー管理.py", title="ユーザー管理", icon="👥", url_path="92_user_admin"),
         ],
     }

@@ -1,4 +1,4 @@
-# pages/41_告知管理.py
+# auth_portal_app/pages/88_告知管理.py
 # ============================================================
 # 📣 Notice Admin（管理者専用：メンテ/アップデート告知の作成・管理）
 # - 認証：common_lib の require_admin_user(st) に一本化
