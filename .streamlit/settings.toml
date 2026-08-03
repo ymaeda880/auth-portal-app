@@ -52,7 +52,6 @@ users = ["maeda", "admin", "t-okamoto", "y-maeda", "h-maeda"]
 login_test = ["maeda", "y-maeda", "admin"]
 
 
-
 [ui]
 banner_key = "yellow_soft"
 
