@@ -645,7 +645,6 @@ def list_survey_records(
             FROM surveys
             {where_sql}
             ORDER BY
-                is_current DESC,
                 updated_at DESC,
                 survey_id DESC,
                 version DESC

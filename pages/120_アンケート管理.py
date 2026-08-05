@@ -93,17 +93,14 @@ from lib.survey.answer_values import (
 )
 
 from lib.survey.db import (
-    clear_current_survey_db,
     count_active_responses,
     count_response_history,
     delete_survey_completely_from_db,
-    get_current_survey_record,
     get_survey_summary_record,
     init_survey_db,
     list_active_response_records,
     list_response_history_records,
     list_survey_records,
-    set_current_survey,
     update_survey_status,
     upsert_survey_definition,
 )
@@ -120,12 +117,10 @@ from lib.survey.paths import (
     resolve_survey_paths,
 )
 from lib.survey.storage import (
-    clear_current_survey,
     delete_survey_files_completely,
     load_all_survey_responses,
     load_survey_definition,
     load_survey_svtex,
-    save_current_survey,
     save_survey_definition,
 )
 from lib.survey.svtex_parser import (
@@ -145,16 +140,13 @@ STATUS_DRAFT = "draft"
 STATUS_SCHEDULED = "scheduled"
 STATUS_RUNNING = "running"
 STATUS_CLOSED = "closed"
-STATUS_ARCHIVED = "archived"
 
 STATUS_LABELS = {
-    STATUS_DRAFT: "下書き",
+    STATUS_DRAFT: "登録済み",
     STATUS_SCHEDULED: "実施予定",
     STATUS_RUNNING: "実施中",
     STATUS_CLOSED: "終了",
-    STATUS_ARCHIVED: "アーカイブ",
 }
-
 CHOICE_TYPES = {
     "radio",
     "select",
@@ -321,12 +313,6 @@ def status_label(
 def survey_record_label(
     record: dict[str, Any],
 ) -> str:
-    current_mark = (
-        "⭐"
-        if int(record.get("is_current") or 0) == 1
-        else "　"
-    )
-
     survey_id = str(
         record.get("survey_id") or "",
     )
@@ -348,7 +334,6 @@ def survey_record_label(
     )
 
     return (
-        f"{current_mark} "
         f"{source_filename} / "
         f"{survey_id} / v{version} / "
         f"{status} / {title}"
@@ -722,6 +707,9 @@ def publish_survey(
     end_date: date,
     start_immediately: bool,
 ) -> None:
+    # ------------------------------------------------------------
+    # 回答期間確認
+    # ------------------------------------------------------------
     if end_date < start_date:
         raise ValueError(
             "回答期限は回答開始日以降にしてください．"
@@ -762,6 +750,9 @@ def publish_survey(
             "回答期間の設定が不正です．"
         )
 
+    # ------------------------------------------------------------
+    # 状態決定
+    # ------------------------------------------------------------
     status_value = (
         STATUS_RUNNING
         if parsed_start <= now <= parsed_end
@@ -777,10 +768,14 @@ def publish_survey(
         existing_record=selected_record,
     )
 
-    save_current_survey(
+    # ------------------------------------------------------------
+    # ID・バージョン別定義を保存
+    # - current領域は使用しない
+    # - 他の公開中アンケートは変更しない
+    # ------------------------------------------------------------
+    save_survey_definition(
         paths,
         definition=definition,
-        status=status,
         svtex_text=svtex_text,
     )
 
@@ -788,15 +783,8 @@ def publish_survey(
         paths.db_path,
         definition=definition,
         status=status,
-        make_current=True,
+        make_current=False,
     )
-
-    set_current_survey(
-        paths.db_path,
-        survey_id=definition.survey_id,
-        version=definition.version,
-    )
-
 
 def close_survey(
     *,
@@ -806,6 +794,9 @@ def close_survey(
     selected_record: dict[str, Any],
     admin_sub: str,
 ) -> None:
+    # ------------------------------------------------------------
+    # 終了状態を生成
+    # ------------------------------------------------------------
     status = build_status(
         definition=definition,
         status_value=STATUS_CLOSED,
@@ -821,6 +812,9 @@ def close_survey(
         existing_record=selected_record,
     )
 
+    # ------------------------------------------------------------
+    # DB状態を終了へ変更
+    # ------------------------------------------------------------
     update_survey_status(
         paths.db_path,
         survey_id=definition.survey_id,
@@ -831,62 +825,6 @@ def close_survey(
         updated_at=status.updated_at,
         updated_by=status.updated_by,
     )
-
-    if int(
-        selected_record.get("is_current") or 0
-    ) == 1:
-        save_current_survey(
-            paths,
-            definition=definition,
-            status=status,
-            svtex_text=svtex_text,
-        )
-
-
-def archive_survey(
-    *,
-    paths: SurveyPaths,
-    definition: SurveyDefinition,
-    selected_record: dict[str, Any],
-    admin_sub: str,
-) -> None:
-    now_iso = utc_now_iso()
-
-    update_survey_status(
-        paths.db_path,
-        survey_id=definition.survey_id,
-        version=definition.version,
-        status=STATUS_ARCHIVED,
-        start_at=(
-            str(
-                selected_record.get("start_at")
-            )
-            if selected_record.get("start_at")
-            else None
-        ),
-        end_at=(
-            str(
-                selected_record.get("end_at")
-            )
-            if selected_record.get("end_at")
-            else None
-        ),
-        updated_at=now_iso,
-        updated_by=admin_sub,
-    )
-
-    if int(
-        selected_record.get("is_current") or 0
-    ) == 1:
-        clear_current_survey(
-            paths,
-        )
-
-        clear_current_survey_db(
-            paths.db_path,
-        )
-
-
 
 # ============================================================
 # アンケート完全削除
@@ -930,13 +868,9 @@ def delete_survey_completely(
     # ------------------------------------------------------------
     # 状態確認
     # ------------------------------------------------------------
-    if current_status not in {
-        STATUS_CLOSED,
-        STATUS_ARCHIVED,
-    }:
+    if current_status != STATUS_CLOSED:
         raise ValueError(
-            "終了またはアーカイブ済みの"
-            "アンケートだけ削除できます．"
+            "終了済みのアンケートだけ削除できます．"
         )
 
     # ------------------------------------------------------------
@@ -1855,7 +1789,7 @@ def render_upload_panel(
     )
 
     if st.button(
-        "下書きとして登録",
+        "登録",
         key="survey_admin_register_button",
         type="primary",
         disabled=not confirm_register,
@@ -1876,7 +1810,7 @@ def render_upload_panel(
 
         else:
             st.success(
-                "アンケートを下書きとして登録しました．"
+                "アンケートを登録しました．"
             )
 
             st.session_state[
@@ -1914,13 +1848,6 @@ def render_survey_selector(
 
     summary_rows = [
         {
-            "現在": (
-                "⭐"
-                if int(
-                    record.get("is_current") or 0
-                ) == 1
-                else ""
-            ),
             "アンケートID": record.get(
                 "survey_id"
             ),
@@ -2077,7 +2004,7 @@ def render_publication_panel(
 
     with p1:
         start_immediately = st.checkbox(
-            "登録後すぐに回答開始",
+            "今すぐ回答受付を開始",
             value=(
                 current_status
                 != STATUS_SCHEDULED
@@ -2087,6 +2014,9 @@ def render_publication_panel(
                 f"{definition.survey_id}_"
                 f"{definition.version}"
             ),
+        )
+        st.caption(
+            "※ チェックしない場合は，回答開始日に自動的に回答受付を開始します．"
         )
 
     with p2:
@@ -2112,9 +2042,8 @@ def render_publication_panel(
             ),
         )
 
-    action1, action2, action3, action4 = st.columns(
+    action1, action2, action3 = st.columns(
         [
-            1,
             1,
             1,
             1,
@@ -2123,7 +2052,7 @@ def render_publication_panel(
 
     with action1:
         confirm_publish = st.checkbox(
-            "公開内容を確認",
+            "公開期日を確認したので公開する",
             value=False,
             key=(
                 "survey_admin_publish_confirm_"
@@ -2132,8 +2061,12 @@ def render_publication_panel(
             ),
         )
 
+        st.caption(
+            "※ チェックしないと「公開」が押せません．"
+        )
+
         if st.button(
-            "このアンケートを公開",
+            "公開",
             key=(
                 "survey_admin_publish_"
                 f"{definition.survey_id}_"
@@ -2178,7 +2111,7 @@ def render_publication_panel(
         )
 
         if st.button(
-            "回答受付を終了",
+            "終了",
             key=(
                 "survey_admin_close_"
                 f"{definition.survey_id}_"
@@ -2210,55 +2143,11 @@ def render_publication_panel(
 
             else:
                 st.success(
-                    "回答受付を終了しました．"
+                    "アンケートを終了しました．"
                 )
                 st.rerun()
 
     with action3:
-        confirm_archive = st.checkbox(
-            "アーカイブ操作を確認",
-            value=False,
-            key=(
-                "survey_admin_archive_confirm_"
-                f"{definition.survey_id}_"
-                f"{definition.version}"
-            ),
-        )
-
-        if st.button(
-            "アーカイブ",
-            key=(
-                "survey_admin_archive_"
-                f"{definition.survey_id}_"
-                f"{definition.version}"
-            ),
-            disabled=(
-                not confirm_archive
-                or current_status
-                == STATUS_ARCHIVED
-            ),
-        ):
-            try:
-                archive_survey(
-                    paths=paths,
-                    definition=definition,
-                    selected_record=selected_record,
-                    admin_sub=admin_sub,
-                )
-
-            except Exception as exc:
-                st.error(
-                    "アンケートをアーカイブできませんでした："
-                    f"{exc}"
-                )
-
-            else:
-                st.success(
-                    "アンケートをアーカイブしました．"
-                )
-                st.rerun()
-
-    with action4:
         confirm_delete = st.checkbox(
             "完全削除を確認",
             value=False,
@@ -2282,11 +2171,7 @@ def render_publication_panel(
             ),
             disabled=(
                 not confirm_delete
-                or current_status
-                not in {
-                    STATUS_CLOSED,
-                    STATUS_ARCHIVED,
-                }
+                or current_status != STATUS_CLOSED
             ),
         ):
             try:

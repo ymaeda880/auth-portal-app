@@ -97,6 +97,7 @@ from lib.survey.answer_values import (
 
 from lib.survey.db import (
     init_survey_db,
+    list_survey_records,
     upsert_active_response,
 )
 from lib.survey.models import (
@@ -117,9 +118,7 @@ from lib.survey.question_widget import (
     sync_question_answer,
 )
 from lib.survey.storage import (
-    current_survey_exists,
-    load_current_definition,
-    load_current_status,
+    load_survey_definition,
     load_user_response,
 )
 from lib.survey.runtime.runtime import (
@@ -145,13 +144,23 @@ from lib.survey.runtime.publication import (
 # ============================================================
 PAGE_NAME = "internal_survey"
 PAGE_TITLE = "📝 社内アンケート"
-PAGE_SUBTITLE = "実施中の社内アンケートに回答"
+PAGE_SUBTITLE = "実施中の社内アンケートを選択して回答"
 
 PHASE_TOP = "top"
 PHASE_ANSWERING = "answering"
 PHASE_CONFIRM = "confirm"
 PHASE_COMPLETED = "completed"
 
+STATUS_SCHEDULED = "scheduled"
+STATUS_RUNNING = "running"
+
+K_SELECTED_SURVEY = (
+    f"{PAGE_NAME}:selected_survey"
+)
+
+K_PREVIOUS_SELECTED_SURVEY = (
+    f"{PAGE_NAME}:previous_selected_survey"
+)
 
 # ============================================================
 # アンケート公開状態
@@ -173,6 +182,156 @@ def get_survey_publication(
         end_at=status.end_at,
         now=now,
         allow_resubmission=True,
+    )
+
+# ============================================================
+# 公開中アンケート取得
+# ============================================================
+def build_survey_status_from_record(
+    record: dict[str, Any],
+) -> SurveyStatus:
+    # ------------------------------------------------------------
+    # DBレコードをSurveyStatusへ変換する
+    # ------------------------------------------------------------
+    return SurveyStatus(
+        survey_id=str(
+            record.get("survey_id") or ""
+        ),
+        version=int(
+            record.get("version") or 1
+        ),
+        status=str(
+            record.get("status") or ""
+        ),
+        start_at=(
+            str(record.get("start_at"))
+            if record.get("start_at")
+            else None
+        ),
+        end_at=(
+            str(record.get("end_at"))
+            if record.get("end_at")
+            else None
+        ),
+        created_at=str(
+            record.get("created_at") or ""
+        ),
+        created_by=str(
+            record.get("created_by") or ""
+        ),
+        updated_at=str(
+            record.get("updated_at") or ""
+        ),
+        updated_by=str(
+            record.get("updated_by") or ""
+        ),
+    )
+
+
+def list_open_survey_records(
+    *,
+    paths: SurveyPaths,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    # ------------------------------------------------------------
+    # scheduled / running のアンケートを取得し，
+    # 現在回答可能なものだけを返す
+    # ------------------------------------------------------------
+    current_time = (
+        now
+        or datetime.now(
+            timezone.utc,
+        )
+    )
+
+    records = list_survey_records(
+        paths.db_path,
+        statuses=[
+            STATUS_SCHEDULED,
+            STATUS_RUNNING,
+        ],
+    )
+
+    open_records: list[dict[str, Any]] = []
+
+    for record in records:
+        status = build_survey_status_from_record(
+            record,
+        )
+
+        publication = get_survey_publication(
+            status=status,
+            now=current_time,
+        )
+
+        if not publication.can_submit:
+            continue
+
+        item = dict(record)
+        item["_status_object"] = status
+        item["_publication"] = publication
+
+        open_records.append(
+            item,
+        )
+
+    return open_records
+
+
+def survey_selection_label(
+    record: dict[str, Any],
+) -> str:
+    # ------------------------------------------------------------
+    # 一覧選択用の表示名
+    # ------------------------------------------------------------
+    title = str(
+        record.get("title") or ""
+    ).strip()
+
+    survey_id = str(
+        record.get("survey_id") or ""
+    ).strip()
+
+    version = int(
+        record.get("version") or 1
+    )
+
+    end_at = format_datetime_jst(
+        record.get("end_at"),
+        empty_text="期限設定なし",
+    )
+
+    return (
+        f"{title} ／ "
+        f"回答期限：{end_at} ／ "
+        f"{survey_id} v{version}"
+    )
+
+
+def render_survey_selection(
+    *,
+    records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    # ------------------------------------------------------------
+    # 公開中アンケートを1件選択する
+    # ------------------------------------------------------------
+    st.subheader(
+        "公開中のアンケート"
+    )
+
+    st.caption(
+        "回答するアンケートを1件選択してください．"
+    )
+
+    selected = st.radio(
+        "アンケート選択",
+        options=records,
+        format_func=survey_selection_label,
+        key=K_SELECTED_SURVEY,
+    )
+
+    return dict(
+        selected or {},
     )
 
 # ============================================================
@@ -1132,44 +1291,113 @@ def main() -> None:
         st.stop()
 
     # ------------------------------------------------------------
-    # currentアンケート確認
-    # ------------------------------------------------------------
-    if not current_survey_exists(
-        paths,
-    ):
-        st.info(
-            "現在，実施中のアンケートはありません．"
-        )
-        st.stop()
-
-    # ------------------------------------------------------------
-    # 定義・状態読み込み
+    # 公開中アンケート一覧
     # ------------------------------------------------------------
     try:
-        definition = load_current_definition(
-            paths,
-        )
-
-        status = load_current_status(
-            paths,
+        open_records = list_open_survey_records(
+            paths=paths,
+            now=datetime.now(
+                timezone.utc,
+            ),
         )
 
     except Exception as exc:
         st.error(
-            "アンケート情報を読み込めませんでした："
+            "公開中のアンケート一覧を"
+            "読み込めませんでした："
             f"{exc}"
         )
         st.stop()
 
-    if (
-        definition is None
-        or status is None
-    ):
+    if not open_records:
         st.info(
-            "現在，実施中のアンケートはありません．"
+            "現在，回答できるアンケートはありません．"
         )
         st.stop()
 
+    # ------------------------------------------------------------
+    # 回答対象を選択
+    # ------------------------------------------------------------
+    selected_record = render_survey_selection(
+        records=open_records,
+    )
+
+    selected_survey_key = (
+        str(
+            selected_record.get("survey_id") or ""
+        ),
+        int(
+            selected_record.get("version") or 1
+        ),
+    )
+
+    previous_survey_key = st.session_state.get(
+        K_PREVIOUS_SELECTED_SURVEY,
+    )
+
+    if (
+        previous_survey_key is not None
+        and previous_survey_key
+        != selected_survey_key
+    ):
+        # --------------------------------------------------------
+        # 別アンケートへ切り替えた場合
+        # - 新しいアンケートは開始画面から表示する
+        # - 他のアンケートの回答途中データは削除しない
+        # --------------------------------------------------------
+        new_phase_key = build_phase_key(
+            survey_id=selected_survey_key[0],
+            user_sub=user_sub,
+        )
+
+        st.session_state[
+            new_phase_key
+        ] = PHASE_TOP
+
+    st.session_state[
+        K_PREVIOUS_SELECTED_SURVEY
+    ] = selected_survey_key
+
+
+    survey_id = str(
+        selected_record.get("survey_id") or ""
+    ).strip()
+
+    version = int(
+        selected_record.get("version") or 1
+    )
+
+    if not survey_id:
+        st.info(
+            "回答するアンケートを選択してください．"
+        )
+        st.stop()
+
+    # ------------------------------------------------------------
+    # 選択された定義を読み込む
+    # ------------------------------------------------------------
+    try:
+        definition = load_survey_definition(
+            paths,
+            survey_id=survey_id,
+            version=version,
+        )
+
+        status = build_survey_status_from_record(
+            selected_record,
+        )
+
+    except Exception as exc:
+        st.error(
+            "選択したアンケートを"
+            "読み込めませんでした："
+            f"{exc}"
+        )
+        st.stop()
+
+    # ------------------------------------------------------------
+    # 定義と状態の対応確認
+    # ------------------------------------------------------------
     if (
         definition.survey_id
         != status.survey_id
@@ -1183,7 +1411,7 @@ def main() -> None:
         st.stop()
 
     # ------------------------------------------------------------
-    # 実施状態確認
+    # 回答可能状態を再確認
     # ------------------------------------------------------------
     publication = get_survey_publication(
         status=status,
@@ -1308,7 +1536,6 @@ def main() -> None:
     # ------------------------------------------------------------
     st.session_state[phase_key] = PHASE_TOP
     st.rerun()
-
 
 # ============================================================
 # entry point
