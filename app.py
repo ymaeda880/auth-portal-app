@@ -69,6 +69,12 @@ pg = st.navigation(
                 icon="🔐",
                 url_path="110_login",
             ),
+            st.Page(
+                "pages/130_使い方.py",
+                title="PAISの使い方",
+                icon="📘",
+                url_path="130_usage_guide",
+            ),
         ],
 
         # "👤 ユーザー": [

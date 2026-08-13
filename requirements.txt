@@ -23,6 +23,8 @@ python-docx             # Word 本文抽出（プレビュー用）
 # PDF / 画像処理
 # ============================
 PyMuPDF                 # PDF プレビュー（fitz）
+reportlab               # PDF 生成（使い方ガイドのPDF出力）
+weasyprint              # HTML/CSSからPDF生成（使い方ガイドの正確版PDF出力）
 
 
 streamlit-clickable-images
