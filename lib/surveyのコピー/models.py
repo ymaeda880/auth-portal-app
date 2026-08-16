@@ -410,6 +410,7 @@ class SurveyStatus:
             ),
         )
 
+
 # ============================================================
 # ユーザー回答
 # ============================================================
@@ -431,49 +432,10 @@ class SurveyResponse:
     )
 
     # ------------------------------------------------------------
-    # 回答途中の位置
-    #
-    # draft保存時に，どの質問まで進んでいたかを保持する．
-    # submittedの場合は空でもよい．
+    # 送信情報
     # ------------------------------------------------------------
-    current_question_id: str = ""
-
-    # ------------------------------------------------------------
-    # 回答状態
-    #
-    # draft
-    # - 回答途中
-    #
-    # submitted
-    # - 回答済み
-    # ------------------------------------------------------------
-    response_status: str = "submitted"
-
-    # ------------------------------------------------------------
-    # 保存・送信情報
-    #
-    # saved_at
-    # - draft / submitted のどちらでも，
-    #   最後にサーバーへ保存した日時
-    #
-    # submitted_at
-    # - 正式に「回答を送信」した日時
-    # - draft の場合は空文字
-    # ------------------------------------------------------------
-    saved_at: str = ""
     submitted_at: str = ""
-
-    # ------------------------------------------------------------
-    # 回答回数
-    #
-    # - 途中保存では増加させない
-    # - 正式送信・再回答時に使用する
-    # ------------------------------------------------------------
     response_revision: int = 1
-
-    # ------------------------------------------------------------
-    # 現在有効な回答か
-    # ------------------------------------------------------------
     is_active: bool = True
 
     # ------------------------------------------------------------
@@ -497,32 +459,6 @@ class SurveyResponse:
             else {}
         )
 
-        # --------------------------------------------------------
-        # 回答状態
-        #
-        # 旧回答JSONには response_status が存在しないため，
-        # submitted_at が存在する旧データは submitted として扱う．
-        # --------------------------------------------------------
-        raw_response_status = str(
-            data.get("response_status") or ""
-        ).strip()
-
-        if raw_response_status in {
-            "draft",
-            "submitted",
-        }:
-            response_status = raw_response_status
-        else:
-            submitted_at = str(
-                data.get("submitted_at") or ""
-            ).strip()
-
-            response_status = (
-                "submitted"
-                if submitted_at
-                else "draft"
-            )
-
         return cls(
             response_id=str(
                 data.get("response_id") or "",
@@ -537,15 +473,6 @@ class SurveyResponse:
                 data.get("user_sub") or "",
             ),
             answers=answers,
-            current_question_id=str(
-                data.get("current_question_id") or "",
-            ),
-            response_status=response_status,
-            saved_at=str(
-                data.get("saved_at")
-                or data.get("updated_at")
-                or "",
-            ),
             submitted_at=str(
                 data.get("submitted_at") or "",
             ),
@@ -559,7 +486,8 @@ class SurveyResponse:
                 data.get("definition_sha256") or "",
             ),
         )
-    
+
+
 # ============================================================
 # 構文チェック結果
 # ============================================================

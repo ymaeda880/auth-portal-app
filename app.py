@@ -95,6 +95,12 @@ pg = st.navigation(
         f"{NAV_PROCESS_ICON} ビューア": [
             st.Page("pages/45_社内文書ビューア.py", title="社内文書ビューア", icon="📚", url_path="45_public_docs"),
             st.Page("pages/42_スライドビューア.py", title="スライドビューア", icon="🖼", url_path="42_slide_viewer"),
+            st.Page(
+                "pages/140_SKSライブラリ検索.py",
+                title="SKSライブラリー検索",
+                icon="📚",
+                url_path="140_sks_library_search",
+            ),
         ],
 
         f"{NAV_PROCESS_ICON} 問い合わせ": [

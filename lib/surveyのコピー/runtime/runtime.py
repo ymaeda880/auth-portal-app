@@ -30,10 +30,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Sequence
 
-from ..answer_values import (
-    SURVEY_ANSWER_SKIP,
-)
-
 from .navigation import (
     SurveyNavigationResult,
     SurveyQuestionPosition,
@@ -42,11 +38,8 @@ from .navigation import (
 
 from .session import (
     RESPONSE_STATUS_DRAFT,
-    SESSION_FIELD_RESPONSE_STATUS,
-    SESSION_FIELD_SUBMITTED_AT,
     SurveySessionInitializeResult,
     SurveySessionState,
-    build_survey_session_identity,
     clear_session_answers,
     get_session_answer,
     get_session_answers,
@@ -55,7 +48,6 @@ from .session import (
     get_survey_session_state,
     has_survey_session,
     initialize_survey_session,
-    mark_session_saved,
     move_session_to_first_question,
     move_session_to_last_question,
     move_session_to_next_question,
@@ -63,15 +55,8 @@ from .session import (
     move_session_to_question,
     refresh_session_current_question,
     remove_session_answer,
-    require_session_mapping,
-    save_session_mapping,
     set_session_answer,
     update_session_answers,
-)
-
-from .response_saver import (
-    SurveyResponseSaveResult,
-    save_draft_response,
 )
 
 from .submission import (
@@ -610,164 +595,6 @@ def update_runtime_answers(
         session_state=session_state,
     )
 
-# ============================================================
-# public API：以降の未回答をすべてスキップ
-# ============================================================
-def skip_remaining_runtime_answers(
-    *,
-    survey_definition: Any,
-    survey_id: str,
-    user_sub: str,
-    updated_at: datetime | None = None,
-    session_state: MutableMapping[str, Any] | None = None,
-) -> SurveyRuntimeState:
-    # ------------------------------------------------------------
-    # 現在状態
-    # ------------------------------------------------------------
-    runtime_state = get_survey_runtime_state(
-        survey_definition=survey_definition,
-        survey_id=survey_id,
-        user_sub=user_sub,
-        session_state=session_state,
-    )
-
-    current_question_id = (
-        runtime_state.current_question_id
-    )
-
-    if current_question_id is None:
-        return runtime_state
-
-    # ------------------------------------------------------------
-    # アンケート定義上の質問順を取得
-    #
-    # 「以降の回答をスキップ」は，
-    # 現在表示されている質問だけではなく，
-    # アンケート定義上で現在位置より後ろにある質問を
-    # 対象とする．
-    #
-    # これによりshow_ifで現在非表示になっている質問も，
-    # 未回答であれば明示的なスキップ状態として保持できる．
-    # ------------------------------------------------------------
-    raw_questions = getattr(
-        survey_definition,
-        "questions",
-        (),
-    )
-
-    questions = tuple(
-        raw_questions or (),
-    )
-
-    all_question_ids: list[str] = []
-
-    for question in questions:
-        raw_question_id = getattr(
-            question,
-            "question_id",
-            None,
-        )
-
-        question_id = normalize_optional_text(
-            raw_question_id,
-        )
-
-        if question_id is None:
-            continue
-
-        all_question_ids.append(
-            question_id,
-        )
-
-    # ------------------------------------------------------------
-    # 現在質問の位置
-    # ------------------------------------------------------------
-    try:
-        current_index = all_question_ids.index(
-            current_question_id,
-        )
-
-    except ValueError:
-        return runtime_state
-
-    remaining_question_ids = (
-        all_question_ids[
-            current_index + 1:
-        ]
-    )
-
-    if not remaining_question_ids:
-        return runtime_state
-
-    # ------------------------------------------------------------
-    # 未回答だけにSURVEY_ANSWER_SKIPを設定
-    #
-    # すでに回答されている質問は絶対に上書きしない．
-    # ------------------------------------------------------------
-    current_answers = dict(
-        runtime_state.answers,
-    )
-
-    skip_answers: dict[str, Any] = {}
-
-    for question_id in remaining_question_ids:
-        if question_id not in current_answers:
-            skip_answers[
-                question_id
-            ] = SURVEY_ANSWER_SKIP
-            continue
-
-        current_value = current_answers[
-            question_id
-        ]
-
-        if is_empty_answer(
-            current_value,
-        ):
-            skip_answers[
-                question_id
-            ] = SURVEY_ANSWER_SKIP
-
-    # ------------------------------------------------------------
-    # スキップ対象がない場合
-    # ------------------------------------------------------------
-    if not skip_answers:
-        return runtime_state
-
-    # ------------------------------------------------------------
-    # 一括反映
-    # ------------------------------------------------------------
-    normalized_updated_at = (
-        normalize_runtime_datetime(
-            updated_at,
-        )
-    )
-
-    update_session_answers(
-        survey_id=survey_id,
-        user_sub=user_sub,
-        answers=skip_answers,
-        updated_at=normalized_updated_at,
-        replace=False,
-        session_state=session_state,
-    )
-
-    # ------------------------------------------------------------
-    # show_ifを再評価
-    # ------------------------------------------------------------
-    refresh_session_current_question(
-        survey_definition=survey_definition,
-        survey_id=survey_id,
-        user_sub=user_sub,
-        session_state=session_state,
-    )
-
-    return get_survey_runtime_state(
-        survey_definition=survey_definition,
-        survey_id=survey_id,
-        user_sub=user_sub,
-        session_state=session_state,
-    )
 
 # ============================================================
 # public API：指定回答削除
@@ -961,214 +788,6 @@ def refresh_survey_runtime(
         session_state=session_state,
     )
 
-# ============================================================
-# public API：回答途中の保存
-# ============================================================
-def save_survey_runtime_draft(
-    *,
-    survey_root: Path,
-    survey_definition: Any,
-    survey_id: str,
-    user_sub: str,
-    additional_response_data: Mapping[str, Any] | None = None,
-    now: datetime | None = None,
-    session_state: MutableMapping[str, Any] | None = None,
-) -> SurveyResponseSaveResult:
-    # ------------------------------------------------------------
-    # 現在のランタイム状態
-    # ------------------------------------------------------------
-    runtime_state = get_survey_runtime_state(
-        survey_definition=survey_definition,
-        survey_id=survey_id,
-        user_sub=user_sub,
-        session_state=session_state,
-    )
-
-    current_session = runtime_state.session
-
-    saved_at = normalize_runtime_datetime(
-        now,
-    )
-
-    # ------------------------------------------------------------
-    # 下書き保存データ
-    #
-    # 途中保存では必須回答チェックを行わない．
-    # 現時点の回答をそのまま保存する．
-    # ------------------------------------------------------------
-    response_data: dict[str, Any] = {
-        "survey_id": survey_id,
-        "survey_version": (
-            current_session.survey_version
-            if current_session.survey_version is not None
-            else extract_survey_version(
-                survey_definition,
-            )
-        ),
-        "survey_title": extract_survey_title(
-            survey_definition,
-        ),
-        "user_sub": user_sub,
-        "response_id": (
-            current_session.response_id
-        ),
-        "response_revision": (
-            current_session.response_revision
-        ),
-
-        # --------------------------------------------------------
-        # runtime.pyではstatusを使用して
-        # セッション初期値を復元しているため，
-        # response_statusだけでなくstatusも保存する．
-        # --------------------------------------------------------
-        "status": RESPONSE_STATUS_DRAFT,
-        "response_status": RESPONSE_STATUS_DRAFT,
-
-        "answers": clone_runtime_value(
-            current_session.answers,
-        ),
-        "current_question_id": (
-            current_session.current_question_id
-        ),
-        "visible_question_ids": list(
-            runtime_state.visible_question_ids,
-        ),
-        "saved_at": saved_at.isoformat(),
-        "submitted_at": None,
-    }
-
-    # ------------------------------------------------------------
-    # 初回読込日時
-    # ------------------------------------------------------------
-    if current_session.loaded_at is not None:
-        response_data[
-            "loaded_at"
-        ] = current_session.loaded_at.isoformat()
-
-    # ------------------------------------------------------------
-    # 最終回答変更日時
-    # ------------------------------------------------------------
-    if current_session.updated_at is not None:
-        response_data[
-            "updated_at"
-        ] = current_session.updated_at.isoformat()
-
-    # ------------------------------------------------------------
-    # ページ側から追加する情報
-    #
-    # user_email等を想定する．
-    # 回答状態に関わる重要フィールドは上書きさせない．
-    # ------------------------------------------------------------
-    if additional_response_data is not None:
-        if not isinstance(
-            additional_response_data,
-            Mapping,
-        ):
-            raise TypeError(
-                (
-                    "additional_response_dataは"
-                    "Mappingで指定してください．"
-                )
-            )
-
-        protected_fields = {
-            "survey_id",
-            "survey_version",
-            "user_sub",
-            "response_id",
-            "response_revision",
-            "status",
-            "response_status",
-            "answers",
-            "current_question_id",
-            "visible_question_ids",
-            "saved_at",
-            "submitted_at",
-            "updated_at",
-        }
-
-        for raw_key, raw_value in (
-            additional_response_data.items()
-        ):
-            key = normalize_required_text(
-                raw_key,
-                field_name=(
-                    "additional_response_data key"
-                ),
-            )
-
-            if key in protected_fields:
-                continue
-
-            response_data[
-                key
-            ] = clone_runtime_value(
-                raw_value,
-            )
-
-    # ------------------------------------------------------------
-    # ファイル保存
-    # ------------------------------------------------------------
-    save_result = save_draft_response(
-        survey_root=Path(
-            survey_root,
-        ),
-        survey_id=survey_id,
-        user_sub=user_sub,
-        response_data=response_data,
-        now=saved_at,
-    )
-
-    if not save_result.success:
-        return save_result
-
-    # ------------------------------------------------------------
-    # セッションをdraft状態へ更新
-    #
-    # mark_session_saved()だけではresponse_statusを
-    # 変更しないため，ここで明示的にdraftへ戻す．
-    # ------------------------------------------------------------
-    identity = build_survey_session_identity(
-        survey_id=survey_id,
-        user_sub=user_sub,
-    )
-
-    state_mapping = require_session_mapping(
-        identity=identity,
-        session_state=session_state,
-    )
-
-    state_mapping[
-        SESSION_FIELD_RESPONSE_STATUS
-    ] = RESPONSE_STATUS_DRAFT
-
-    state_mapping[
-        SESSION_FIELD_SUBMITTED_AT
-    ] = None
-
-    save_session_mapping(
-        identity=identity,
-        state_mapping=state_mapping,
-        session_state=session_state,
-    )
-
-    # ------------------------------------------------------------
-    # 保存日時・response_id・revisionを
-    # session_stateへ反映
-    # ------------------------------------------------------------
-    mark_session_saved(
-        survey_id=survey_id,
-        user_sub=user_sub,
-        saved_at=saved_at,
-        response_id=save_result.response_id,
-        response_revision=(
-            save_result.response_revision
-        ),
-        message="回答途中の内容を保存しました．",
-        session_state=session_state,
-    )
-
-    return save_result
 
 # ============================================================
 # public API：回答提出

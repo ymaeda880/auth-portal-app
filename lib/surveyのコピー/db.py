@@ -127,11 +127,7 @@ CREATE TABLE IF NOT EXISTS survey_responses (
     survey_id          TEXT NOT NULL,
     survey_version     INTEGER NOT NULL,
     user_sub           TEXT NOT NULL,
-
-    response_status    TEXT NOT NULL DEFAULT 'submitted',
-    saved_at           TEXT,
-
-    submitted_at       TEXT NOT NULL DEFAULT '',
+    submitted_at       TEXT NOT NULL,
     response_revision  INTEGER NOT NULL DEFAULT 1,
     is_active          INTEGER NOT NULL DEFAULT 1,
     definition_sha256  TEXT,
@@ -222,83 +218,6 @@ def connect_survey_db(
     return con
 
 
-# ============================================================
-# DBマイグレーション
-# ============================================================
-def _migrate_survey_response_columns(
-    con: sqlite3.Connection,
-) -> None:
-    # ------------------------------------------------------------
-    # 現在のsurvey_responses列を取得
-    # ------------------------------------------------------------
-    rows = con.execute(
-        """
-        PRAGMA table_info(survey_responses)
-        """
-    ).fetchall()
-
-    existing_columns = {
-        str(row["name"])
-        for row in rows
-    }
-
-    # ------------------------------------------------------------
-    # response_status
-    #
-    # 既存回答はすべて従来の正式回答なので，
-    # submittedをデフォルト値とする．
-    # ------------------------------------------------------------
-    if "response_status" not in existing_columns:
-        con.execute(
-            """
-            ALTER TABLE survey_responses
-            ADD COLUMN response_status
-            TEXT NOT NULL DEFAULT 'submitted'
-            """
-        )
-
-    # ------------------------------------------------------------
-    # saved_at
-    #
-    # 既存データはupdated_atを後で補完する．
-    # ------------------------------------------------------------
-    if "saved_at" not in existing_columns:
-        con.execute(
-            """
-            ALTER TABLE survey_responses
-            ADD COLUMN saved_at TEXT
-            """
-        )
-
-    # ------------------------------------------------------------
-    # 既存回答のsaved_atを補完
-    # ------------------------------------------------------------
-    con.execute(
-        """
-        UPDATE survey_responses
-        SET
-            saved_at = updated_at
-        WHERE
-            saved_at IS NULL
-            OR TRIM(saved_at) = ''
-        """
-    )
-
-    # ------------------------------------------------------------
-    # 既存回答のresponse_statusを補完
-    # ------------------------------------------------------------
-    con.execute(
-        """
-        UPDATE survey_responses
-        SET
-            response_status = 'submitted'
-        WHERE
-            response_status IS NULL
-            OR TRIM(response_status) = ''
-        """
-    )
-
-
 def init_survey_db(
     db_path: Path,
 ) -> None:
@@ -311,33 +230,8 @@ def init_survey_db(
         con.executescript(
             SCHEMA_SQL,
         )
-
-        # --------------------------------------------------------
-        # 既存DBを現在スキーマへ更新
-        # --------------------------------------------------------
-        _migrate_survey_response_columns(
-            con,
-        )
-
-        # --------------------------------------------------------
-        # response_status追加後のINDEX
-        #
-        # 既存DBではSCHEMA_SQL実行時点に列が存在しない場合が
-        # あるため，マイグレーション後にも作成する．
-        # --------------------------------------------------------
-        con.execute(
-            """
-            CREATE INDEX IF NOT EXISTS
-            idx_survey_responses_status
-            ON survey_responses (
-                survey_id,
-                response_status,
-                is_active
-            )
-            """
-        )
-
         con.commit()
+
 
 # ============================================================
 # アンケート定義登録
@@ -829,58 +723,15 @@ def upsert_active_response(
     updated_at: str,
 ) -> None:
     # ------------------------------------------------------------
-    # 回答数
+    # 有効回答の登録・更新
     # ------------------------------------------------------------
     answer_count = len(
         response.answers,
     )
 
-    # ------------------------------------------------------------
-    # 回答状態
-    # ------------------------------------------------------------
-    response_status = str(
-        response.response_status
-        or "submitted"
-    ).strip().lower()
-
-    if response_status not in {
-        "draft",
-        "submitted",
-    }:
-        raise ValueError(
-            (
-                "response_statusは"
-                "draftまたはsubmittedで"
-                "指定してください．"
-            )
-        )
-
-    # ------------------------------------------------------------
-    # 保存日時
-    # ------------------------------------------------------------
-    saved_at = str(
-        response.saved_at
-        or updated_at
-        or ""
-    ).strip()
-
-    # ------------------------------------------------------------
-    # submitted_at
-    #
-    # DBの既存定義ではNOT NULLなので，
-    # draftの場合は空文字を保存する．
-    # ------------------------------------------------------------
-    submitted_at = str(
-        response.submitted_at
-        or ""
-    ).strip()
-
     with connect_survey_db(
         db_path,
     ) as con:
-        # --------------------------------------------------------
-        # 現在有効な回答
-        # --------------------------------------------------------
         existing = con.execute(
             """
             SELECT
@@ -898,79 +749,10 @@ def upsert_active_response(
             ),
         ).fetchone()
 
-        # --------------------------------------------------------
-        # 既存回答がdraftの場合
-        #
-        # draft → draft
-        # draft → submitted
-        #
-        # 同じ回答作業の継続なので，
-        # 履歴へは退避せず現在行を更新する．
-        # --------------------------------------------------------
-        if (
-            existing is not None
-            and str(
-                existing["response_status"]
-                or ""
-            ).strip().lower() == "draft"
-        ):
-            con.execute(
-                """
-                UPDATE survey_responses
-                SET
-                    response_id = ?,
-                    survey_version = ?,
-                    response_status = ?,
-                    saved_at = ?,
-                    submitted_at = ?,
-                    response_revision = ?,
-                    is_active = 1,
-                    definition_sha256 = ?,
-                    answer_count = ?,
-                    response_path = ?,
-                    updated_at = ?
-                WHERE
-                    survey_id = ?
-                    AND user_sub = ?
-                    AND is_active = 1
-                """,
-                (
-                    response.response_id,
-                    response.survey_version,
-                    response_status,
-                    saved_at,
-                    submitted_at,
-                    response.response_revision,
-                    response.definition_sha256,
-                    answer_count,
-                    str(response_path),
-                    updated_at,
-                    response.survey_id,
-                    response.user_sub,
-                ),
-            )
-
-            con.commit()
-            return
-
-
-        # --------------------------------------------------------
-        # 既存回答がsubmittedの場合
-        #
-        # submitted → draft
-        # - 再回答の途中保存
-        #
-        # submitted → submitted
-        # - 途中保存せず直接再回答を送信
-        #
-        # どちらの場合も，
-        # 既存の正式回答を履歴へ退避したうえで，
-        # 現在回答の同じ行を更新する．
-        #
-        # response_idは回答を通して維持するため，
-        # 新しい行としてINSERTしない．
-        # --------------------------------------------------------
         if existing is not None:
+            # ----------------------------------------------------
+            # 既存回答を履歴テーブルへ退避
+            # ----------------------------------------------------
             con.execute(
                 """
                 INSERT INTO survey_response_history (
@@ -1005,49 +787,25 @@ def upsert_active_response(
             )
 
             # ----------------------------------------------------
-            # 現在回答を更新
-            #
-            # response_idは変更しない．
-            # 正式回答の旧版は上でhistoryへ保存済み．
+            # 既存回答を無効化
             # ----------------------------------------------------
             con.execute(
                 """
                 UPDATE survey_responses
                 SET
-                    survey_version = ?,
-                    response_status = ?,
-                    saved_at = ?,
-                    submitted_at = ?,
-                    response_revision = ?,
-                    is_active = 1,
-                    definition_sha256 = ?,
-                    answer_count = ?,
-                    response_path = ?,
+                    is_active = 0,
                     updated_at = ?
                 WHERE
                     response_id = ?
                 """,
                 (
-                    response.survey_version,
-                    response_status,
-                    saved_at,
-                    submitted_at,
-                    response.response_revision,
-                    response.definition_sha256,
-                    answer_count,
-                    str(response_path),
                     updated_at,
                     existing["response_id"],
                 ),
             )
 
-            con.commit()
-            return
-
         # --------------------------------------------------------
-        # 新規回答
-        #
-        # 既存回答が存在しない場合だけ新しい行を作成する．
+        # 新しい有効回答を登録
         # --------------------------------------------------------
         con.execute(
             """
@@ -1056,8 +814,6 @@ def upsert_active_response(
                 survey_id,
                 survey_version,
                 user_sub,
-                response_status,
-                saved_at,
                 submitted_at,
                 response_revision,
                 is_active,
@@ -1068,9 +824,7 @@ def upsert_active_response(
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?,
-                ?, ?,
-                1,
-                ?, ?, ?, ?
+                1, ?, ?, ?, ?
             )
             """,
             (
@@ -1078,9 +832,7 @@ def upsert_active_response(
                 response.survey_id,
                 response.survey_version,
                 response.user_sub,
-                response_status,
-                saved_at,
-                submitted_at,
+                response.submitted_at,
                 response.response_revision,
                 response.definition_sha256,
                 answer_count,
@@ -1089,7 +841,8 @@ def upsert_active_response(
             ),
         )
 
-        con.commit()        
+        con.commit()
+
 
 # ============================================================
 # ユーザー回答取得
@@ -1143,7 +896,6 @@ def list_active_response_records(
             WHERE
                 survey_id = ?
                 AND is_active = 1
-                AND response_status = 'submitted'
             ORDER BY
                 submitted_at DESC,
                 user_sub ASC
@@ -1158,40 +910,6 @@ def list_active_response_records(
         for row in rows
     ]
 
-
-def list_draft_response_records(
-    db_path: Path,
-    *,
-    survey_id: str,
-) -> list[dict[str, Any]]:
-    # ------------------------------------------------------------
-    # 回答途中のユーザー一覧
-    # ------------------------------------------------------------
-    with connect_survey_db(
-        db_path,
-    ) as con:
-        rows = con.execute(
-            """
-            SELECT
-                *
-            FROM survey_responses
-            WHERE
-                survey_id = ?
-                AND is_active = 1
-                AND response_status = 'draft'
-            ORDER BY
-                saved_at DESC,
-                user_sub ASC
-            """,
-            (
-                survey_id,
-            ),
-        ).fetchall()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
 
 def list_response_history_records(
     db_path: Path,
@@ -1256,7 +974,6 @@ def count_active_responses(
             WHERE
                 survey_id = ?
                 AND is_active = 1
-                AND response_status = 'submitted'
             """,
             (
                 survey_id,
@@ -1269,37 +986,6 @@ def count_active_responses(
         else 0
     )
 
-def count_draft_responses(
-    db_path: Path,
-    *,
-    survey_id: str,
-) -> int:
-    # ------------------------------------------------------------
-    # 回答途中件数
-    # ------------------------------------------------------------
-    with connect_survey_db(
-        db_path,
-    ) as con:
-        row = con.execute(
-            """
-            SELECT
-                COUNT(*) AS cnt
-            FROM survey_responses
-            WHERE
-                survey_id = ?
-                AND is_active = 1
-                AND response_status = 'draft'
-            """,
-            (
-                survey_id,
-            ),
-        ).fetchone()
-
-    return int(
-        row["cnt"]
-        if row is not None
-        else 0
-    )
 
 def count_response_history(
     db_path: Path,
@@ -1355,40 +1041,22 @@ def get_survey_summary_record(
                 s.updated_at,
                 COUNT(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN 1
                     END
                 ) AS active_response_count,
-
-                COUNT(
-                    CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'draft'
-                        THEN 1
-                    END
-                ) AS draft_response_count,
-
                 MIN(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN r.submitted_at
                     END
                 ) AS first_response_at,
-
                 MAX(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN r.submitted_at
                     END
                 ) AS last_response_at
-                
             FROM surveys AS s
             LEFT JOIN survey_responses AS r
                 ON r.survey_id = s.survey_id
@@ -1432,40 +1100,22 @@ def list_survey_summary_records(
                 s.updated_at,
                 COUNT(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN 1
                     END
                 ) AS active_response_count,
-
-                COUNT(
-                    CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'draft'
-                        THEN 1
-                    END
-                ) AS draft_response_count,
-
                 MIN(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN r.submitted_at
                     END
                 ) AS first_response_at,
-
                 MAX(
                     CASE
-                        WHEN
-                            r.is_active = 1
-                            AND r.response_status = 'submitted'
+                        WHEN r.is_active = 1
                         THEN r.submitted_at
                     END
                 ) AS last_response_at
-                
             FROM surveys AS s
             LEFT JOIN survey_responses AS r
                 ON r.survey_id = s.survey_id

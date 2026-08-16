@@ -605,37 +605,15 @@ def save_user_response(
     )
 
     # ------------------------------------------------------------
-    # 既存回答
-    #
-    # 回答途中の上書きでは履歴を増やさない．
-    #
-    # 既存回答がsubmittedの場合だけ，
-    # 直前の正式回答として履歴へ退避する．
+    # 既存回答があれば履歴へ退避
     # ------------------------------------------------------------
-    if (
-        preserve_previous
-        and response_path.is_file()
-    ):
-        existing_data = read_json_file(
-            response_path,
+    if preserve_previous and response_path.is_file():
+        _archive_existing_response(
+            paths,
+            survey_id=response.survey_id,
+            user_sub=response.user_sub,
+            response_path=response_path,
         )
-
-        existing_response = (
-            SurveyResponse.from_dict(
-                existing_data,
-            )
-        )
-
-        if (
-            existing_response.response_status
-            == "submitted"
-        ):
-            _archive_existing_response(
-                paths,
-                survey_id=response.survey_id,
-                user_sub=response.user_sub,
-                response_path=response_path,
-            )
 
     # ------------------------------------------------------------
     # 新しい回答を最新回答として保存

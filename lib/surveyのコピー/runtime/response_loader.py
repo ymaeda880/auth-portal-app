@@ -55,8 +55,6 @@ RESPONSE_REQUIRED_FIELDS = {
 
 RESPONSE_OPTIONAL_FIELDS = {
     "response_id",
-    "response_status",
-    "saved_at",
     "submitted_at",
     "updated_at",
     "response_revision",
@@ -233,59 +231,6 @@ class SurveyResponseLoadResult:
 
         return 0
 
-    # ------------------------------------------------------------
-    # 回答状態
-    # ------------------------------------------------------------
-    @property
-    def response_status(self) -> str:
-        value = self.response_data.get(
-            "response_status",
-        )
-
-        if isinstance(
-            value,
-            str,
-        ):
-            normalized = value.strip().lower()
-
-            if normalized in {
-                "draft",
-                "submitted",
-            }:
-                return normalized
-
-        # --------------------------------------------------------
-        # 旧回答JSONとの互換
-        #
-        # response_status が存在しない場合は，
-        # submitted_at の有無から状態を判断する．
-        # --------------------------------------------------------
-        if self.submitted_at is not None:
-            return "submitted"
-
-        return "draft"
-
-    # ------------------------------------------------------------
-    # 最終保存日時
-    # ------------------------------------------------------------
-    @property
-    def saved_at(self) -> datetime | None:
-        saved_at = parse_response_datetime(
-            self.response_data.get(
-                "saved_at",
-            )
-        )
-
-        if saved_at is not None:
-            return saved_at
-
-        # --------------------------------------------------------
-        # 旧回答JSONとの互換
-        # --------------------------------------------------------
-        return self.updated_at
-
-
-
     @property
     def submitted_at(self) -> datetime | None:
         return parse_response_datetime(
@@ -328,14 +273,6 @@ class SurveyResponseLoadResult:
             "response_revision": (
                 self.response_revision
             ),
-            "response_status": (
-                self.response_status
-            ),
-            "saved_at": (
-                self.saved_at.isoformat()
-                if self.saved_at is not None
-                else None
-            ),
             "submitted_at": (
                 self.submitted_at.isoformat()
                 if self.submitted_at is not None
@@ -374,6 +311,7 @@ def build_current_response_path(
         / normalized_survey_id
         / f"{normalized_user_sub}.json"
     )
+
 
 # ============================================================
 # public API：現在回答の読込
@@ -967,96 +905,6 @@ def validate_and_normalize_response_data(
                 "answers"
             ] = normalized_answers
 
-
-    # ------------------------------------------------------------
-    # response_status
-    #
-    # draft
-    # - 回答途中
-    #
-    # submitted
-    # - 正式回答済み
-    # ------------------------------------------------------------
-    raw_response_status = normalized_data.get(
-        "response_status",
-    )
-
-    if raw_response_status is None:
-        # --------------------------------------------------------
-        # 旧回答JSONとの互換
-        #
-        # response_status がない場合は，
-        # submitted_at の有無から判断する．
-        # --------------------------------------------------------
-        raw_submitted_at = normalized_data.get(
-            "submitted_at",
-        )
-
-        if raw_submitted_at is None:
-            normalized_response_status = "draft"
-
-        elif (
-            isinstance(
-                raw_submitted_at,
-                str,
-            )
-            and not raw_submitted_at.strip()
-        ):
-            normalized_response_status = "draft"
-
-        else:
-            normalized_response_status = "submitted"
-
-        normalized_data[
-            "response_status"
-        ] = normalized_response_status
-
-    elif not isinstance(
-        raw_response_status,
-        str,
-    ):
-        errors.append(
-            ResponseLoadIssue(
-                severity="error",
-                message=(
-                    "response_statusは文字列で"
-                    "指定してください．"
-                ),
-                field_name="response_status",
-                file_path=file_path,
-            )
-        )
-
-    else:
-        normalized_response_status = (
-            raw_response_status
-            .strip()
-            .lower()
-        )
-
-        if normalized_response_status not in {
-            "draft",
-            "submitted",
-        }:
-            errors.append(
-                ResponseLoadIssue(
-                    severity="error",
-                    message=(
-                        "response_statusは"
-                        "'draft' または "
-                        "'submitted' を"
-                        "指定してください．"
-                    ),
-                    field_name="response_status",
-                    file_path=file_path,
-                )
-            )
-
-        else:
-            normalized_data[
-                "response_status"
-            ] = normalized_response_status
-
     # ------------------------------------------------------------
     # response_revision
     # ------------------------------------------------------------
@@ -1177,7 +1025,6 @@ def validate_and_normalize_response_data(
     # 日時フィールド
     # ------------------------------------------------------------
     for field_name in (
-        "saved_at",
         "submitted_at",
         "updated_at",
     ):

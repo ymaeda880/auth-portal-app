@@ -39,7 +39,7 @@ SURVEY_SPECIAL_ANSWER_VALUES = frozenset(
 # ============================================================
 SURVEY_SPECIAL_ANSWER_LABELS = {
     SURVEY_ANSWER_NONE: "該当なし",
-    SURVEY_ANSWER_SKIP: "回答をスキップする",
+    SURVEY_ANSWER_SKIP: "回答しない",
 }
 
 

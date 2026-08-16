@@ -29,15 +29,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Sequence
 
-from ..answer_values import (
-    SURVEY_ANSWER_SKIP,
-)
-
-from .response_saver import (
-    SurveyResponseSaveResult,
-    save_submitted_response,
-)
-
 from .response_saver import (
     SurveyResponseSaveResult,
     save_submitted_response,
@@ -671,24 +662,13 @@ def build_submission_response_data(
         ),
         "user_sub": normalized_user_sub,
         "response_id": session.response_id,
-
         "response_revision": (
             session.response_revision
         ),
-
-        # --------------------------------------------------------
-        # 回答状態
-        #
-        # statusは既存処理との互換のため残す．
-        # response_statusを回答JSONの正式な状態として保存する．
-        # --------------------------------------------------------
         "status": RESPONSE_STATUS_SUBMITTED,
-        "response_status": RESPONSE_STATUS_SUBMITTED,
-
         "answers": clone_session_value(
             session.answers,
         ),
-
         "visible_question_ids": [
             normalize_required_text(
                 question_id,
@@ -728,12 +708,8 @@ def build_submission_response_data(
 
         protected_fields = {
             "survey_id",
-            "survey_version",
             "user_sub",
-            "response_id",
-            "response_revision",
             "status",
-            "response_status",
             "answers",
             "submitted_at",
             "saved_at",
@@ -814,19 +790,6 @@ def validate_one_submission_answer(
     if is_empty_answer(
         answer_value,
     ):
-        return issues
-
-    # ------------------------------------------------------------
-    # 明示的な回答スキップ
-    #
-    # 「回答をスキップする」および
-    # 「以降の回答をスキップ」で設定された値は，
-    # 正式な回答として扱う．
-    #
-    # SURVEY_ANSWER_SKIPは通常のoptionsには含まれないため，
-    # 選択肢との整合性チェックへ進めない．
-    # ------------------------------------------------------------
-    if answer_value == SURVEY_ANSWER_SKIP:
         return issues
 
     # ------------------------------------------------------------

@@ -1048,7 +1048,6 @@ RESPONSE_STATUS_DRAFT = "draft"
 RESPONSE_STATUS_SUBMITTED = "submitted"
 
 
-
 # ============================================================
 # public API：下書き回答の保存
 # ============================================================
@@ -1064,6 +1063,12 @@ def save_draft_response(
         now,
     )
 
+    # ------------------------------------------------------------
+    # 既存回答の状態を確認する
+    #
+    # 下書き保存では，既存回答が提出済みの場合も
+    # 回答履歴として退避してから保存する
+    # ------------------------------------------------------------
     response_path = build_current_response_path(
         responses_root=survey_root,
         survey_id=survey_id,
@@ -1076,94 +1081,17 @@ def save_draft_response(
         )
     )
 
-    # ------------------------------------------------------------
-    # 下書きのresponse_revision
-    #
-    # 下書き保存そのものではrevisionを増やさない．
-    #
-    # 優先順位：
-    # 1. 呼出側が持っているrevision
-    # 2. 既存回答のrevision
-    # 3. 新規回答として1
-    #
-    # 再回答開始時にページ側がrevisionを+1している場合は，
-    # その値をそのまま維持する．
-    # ------------------------------------------------------------
-    incoming_revision = extract_response_revision(
-        response_data,
+    next_revision = resolve_next_response_revision(
+        incoming_response_data=response_data,
+        existing_response_data=(
+            existing_response_data
+        ),
     )
-
-    existing_revision = extract_response_revision(
-        existing_response_data,
-    ) if existing_response_data is not None else None
-
-    if incoming_revision is not None:
-        draft_revision = incoming_revision
-
-    elif existing_revision is not None:
-        draft_revision = existing_revision
-
-    else:
-        draft_revision = 1
-
-    # ------------------------------------------------------------
-    # response_id
-    #
-    # 既存の下書きを更新する場合は同じresponse_idを使用する．
-    # 呼出側にresponse_idがない場合は既存値を引き継ぐ．
-    # ------------------------------------------------------------
-    prepared_source = clone_json_value(
-        response_data,
-    )
-
-    if not isinstance(
-        prepared_source,
-        dict,
-    ):
-        raise TypeError(
-            "response_dataをdictへ変換できません．"
-        )
-
-    if not prepared_source.get(
-        "response_id",
-    ):
-        existing_response_id = (
-            extract_response_id(
-                existing_response_data,
-            )
-            if existing_response_data is not None
-            else None
-        )
-
-        if existing_response_id:
-            prepared_source[
-                "response_id"
-            ] = existing_response_id
 
     prepared_data = build_draft_response_data(
-        response_data=prepared_source,
-        response_revision=draft_revision,
+        response_data=response_data,
+        response_revision=next_revision,
         saved_at=saved_at,
-    )
-
-    # ------------------------------------------------------------
-    # 履歴退避
-    #
-    # draft → draft
-    # - 履歴を作らない
-    #
-    # submitted → draft
-    # - 再回答を途中保存する際に，
-    #   直前の正式回答を失わないよう1回だけ履歴へ退避する
-    #
-    # 以後はcurrentがdraftになるため，
-    # draft保存のたびに履歴が増えることはない．
-    # ------------------------------------------------------------
-    archive_existing = (
-        existing_response_data is not None
-        and is_saved_response_submitted(
-            existing_response_data,
-        )
     )
 
     return save_current_response(
@@ -1171,9 +1099,12 @@ def save_draft_response(
         survey_id=survey_id,
         user_sub=user_sub,
         response_data=prepared_data,
-        archive_existing=archive_existing,
+        archive_existing=(
+            existing_response_data is not None
+        ),
         now=saved_at,
     )
+
 
 # ============================================================
 # public API：提出済み回答の保存
@@ -1253,68 +1184,12 @@ def save_submitted_response(
             ),
         )
 
-    # ------------------------------------------------------------
-    # 正式送信時のresponse_revision
-    #
-    # draft → submitted
-    # - 途中保存時のrevisionをそのまま使用する
-    #
-    # submitted → submitted
-    # - 再回答としてrevisionを1増やす
-    #
-    # 新規提出
-    # - 呼出側のrevisionを使用する
-    # - 未指定なら1
-    # ------------------------------------------------------------
-    incoming_revision = extract_response_revision(
-        response_data,
+    next_revision = resolve_next_response_revision(
+        incoming_response_data=response_data,
+        existing_response_data=(
+            existing_response_data
+        ),
     )
-
-    if (
-        existing_response_data is not None
-        and is_saved_response_draft(
-            existing_response_data,
-        )
-    ):
-        existing_revision = (
-            extract_response_revision(
-                existing_response_data,
-            )
-        )
-
-        if incoming_revision is not None:
-            next_revision = incoming_revision
-
-        elif existing_revision is not None:
-            next_revision = existing_revision
-
-        else:
-            next_revision = 1
-
-    elif (
-        existing_response_data is not None
-        and is_saved_response_submitted(
-            existing_response_data,
-        )
-    ):
-        existing_revision = (
-            extract_response_revision(
-                existing_response_data,
-            )
-        )
-
-        if existing_revision is None:
-            existing_revision = 1
-
-        next_revision = (
-            existing_revision + 1
-        )
-
-    elif incoming_revision is not None:
-        next_revision = incoming_revision
-
-    else:
-        next_revision = 1
 
     prepared_data = build_submitted_response_data(
         response_data=response_data,
@@ -1327,22 +1202,12 @@ def save_submitted_response(
         survey_id=survey_id,
         user_sub=user_sub,
         response_data=prepared_data,
-
-        # --------------------------------------------------------
-        # currentがdraftの場合は，
-        # そのdraftを正式回答履歴には残さない．
-        #
-        # currentがsubmittedの場合だけ，
-        # 再回答前の正式回答として履歴へ退避する．
-        # --------------------------------------------------------
         archive_existing=(
             existing_response_data is not None
-            and is_saved_response_submitted(
-                existing_response_data,
-            )
         ),
         now=submitted_at,
     )
+
 
 # ============================================================
 # 下書き回答データの生成
@@ -1373,21 +1238,6 @@ def build_draft_response_data(
             "response_dataをdictへ変換できません．"
         )
 
-    # ------------------------------------------------------------
-    # response_id
-    #
-    # 初回の途中保存でも回答IDを確定する．
-    # 以後の途中保存・正式送信では同じIDを引き継ぐ．
-    # ------------------------------------------------------------
-    if not normalized_data.get(
-        "response_id",
-    ):
-        normalized_data[
-            "response_id"
-        ] = str(
-            uuid4()
-        )
-
     normalized_data[
         "response_status"
     ] = RESPONSE_STATUS_DRAFT
@@ -1398,29 +1248,15 @@ def build_draft_response_data(
         response_revision,
     )
 
-    # ------------------------------------------------------------
-    # 下書きでは正式送信日時を持たない
-    # ------------------------------------------------------------
     normalized_data[
         "submitted_at"
     ] = None
 
-    normalized_saved_at = (
-        normalize_save_datetime(
-            saved_at,
-        )
-    )
-
-    # ------------------------------------------------------------
-    # 最終保存日時
-    # ------------------------------------------------------------
-    normalized_data[
-        "saved_at"
-    ] = normalized_saved_at.isoformat()
-
     normalized_data[
         "updated_at"
-    ] = normalized_saved_at.isoformat()
+    ] = normalize_save_datetime(
+        saved_at,
+    ).isoformat()
 
     return normalized_data
 
@@ -1481,10 +1317,6 @@ def build_submitted_response_data(
     )
 
     normalized_data[
-        "saved_at"
-    ] = normalized_submitted_at.isoformat()
-
-    normalized_data[
         "submitted_at"
     ] = normalized_submitted_at.isoformat()
 
@@ -1493,6 +1325,7 @@ def build_submitted_response_data(
     ] = normalized_submitted_at.isoformat()
 
     return normalized_data
+
 
 # ============================================================
 # 次の回答リビジョンを決定

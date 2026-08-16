@@ -91,7 +91,6 @@ from lib.survey.answer_validator import (
 )
 
 from lib.survey.answer_values import (
-    SURVEY_ANSWER_SKIP,
     get_survey_special_answer_label,
     is_survey_special_answer,
 )
@@ -130,9 +129,7 @@ from lib.survey.runtime.runtime import (
     move_runtime_to_first_question,
     move_runtime_to_next_question,
     move_runtime_to_previous_question,
-    save_survey_runtime_draft,
     set_runtime_answer,
-    skip_remaining_runtime_answers,
     submit_survey_runtime,
 )
 
@@ -414,91 +411,13 @@ def start_survey(
     definition: SurveyDefinition,
     user_sub: str,
     phase_key: str,
-    existing_response: SurveyResponse | None = None,
-    resume_draft: bool = False,
-    reanswer: bool = False,
+    loaded_response: SurveyResponse | None,
 ) -> None:
-    # ------------------------------------------------------------
-    # Widget状態を初期化
-    # ------------------------------------------------------------
     clear_question_widget_states(
         survey_id=definition.survey_id,
         user_sub=user_sub,
     )
 
-    # ------------------------------------------------------------
-    # 初期読込データ
-    #
-    # resume_draft=True
-    # - 途中保存した回答と現在位置を復元する
-    #
-    # reanswer=True
-    # - 前回の正式回答を初期値として読み込み，
-    #   revisionを1増やして再回答を開始する
-    #
-    # それ以外
-    # - 新規回答として開始する
-    # ------------------------------------------------------------
-    loaded_response: dict[str, Any] | None = None
-
-    if (
-        existing_response is not None
-        and resume_draft
-    ):
-        loaded_response = (
-            existing_response.to_dict()
-        )
-
-        loaded_response[
-            "status"
-        ] = "draft"
-
-        loaded_response[
-            "response_status"
-        ] = "draft"
-
-    elif (
-        existing_response is not None
-        and reanswer
-    ):
-        loaded_response = (
-            existing_response.to_dict()
-        )
-
-        # --------------------------------------------------------
-        # 再回答では前回回答を初期値として使用するが，
-        # 回答状態はdraftへ戻す．
-        # --------------------------------------------------------
-        loaded_response[
-            "status"
-        ] = "draft"
-
-        loaded_response[
-            "response_status"
-        ] = "draft"
-
-        loaded_response[
-            "submitted_at"
-        ] = ""
-
-        loaded_response[
-            "saved_at"
-        ] = ""
-
-        loaded_response[
-            "current_question_id"
-        ] = ""
-
-        loaded_response[
-            "response_revision"
-        ] = (
-            existing_response.response_revision
-            + 1
-        )
-
-    # ------------------------------------------------------------
-    # ランタイム初期化
-    # ------------------------------------------------------------
     initialize_result = initialize_survey_runtime(
         survey_definition=definition,
         survey_id=definition.survey_id,
@@ -514,34 +433,16 @@ def start_survey(
         )
         return
 
-    # ------------------------------------------------------------
-    # 新規回答・再回答
-    #
-    # 保存済み位置がない場合は最初の質問へ移動する．
-    # ------------------------------------------------------------
-    runtime_state = get_survey_runtime_state(
+    move_runtime_to_first_question(
         survey_definition=definition,
         survey_id=definition.survey_id,
         user_sub=user_sub,
         session_state=st.session_state,
     )
 
-    if (
-        not resume_draft
-        or not runtime_state.current_question_id
-    ):
-        move_runtime_to_first_question(
-            survey_definition=definition,
-            survey_id=definition.survey_id,
-            user_sub=user_sub,
-            session_state=st.session_state,
-        )
-
-    st.session_state[
-        phase_key
-    ] = PHASE_ANSWERING
-
+    st.session_state[phase_key] = PHASE_ANSWERING
     st.rerun()
+
 
 # ============================================================
 # DB登録
@@ -626,95 +527,6 @@ def register_submitted_response_to_db(
         updated_at=updated_at,
     )
 
-# ============================================================
-# 回答途中のDB登録
-# ============================================================
-def register_draft_response_to_db(
-    *,
-    paths: SurveyPaths,
-    save_result: Any,
-) -> None:
-    # ------------------------------------------------------------
-    # 保存済み回答データ
-    # ------------------------------------------------------------
-    response_data = getattr(
-        save_result,
-        "response_data",
-        None,
-    )
-
-    response_path = getattr(
-        save_result,
-        "response_path",
-        None,
-    )
-
-    saved_at = getattr(
-        save_result,
-        "saved_at",
-        None,
-    )
-
-    if not isinstance(
-        response_data,
-        dict,
-    ):
-        raise ValueError(
-            "途中保存した回答データが取得できませんでした．"
-        )
-
-    if response_path is None:
-        raise ValueError(
-            "途中保存した回答の保存先が取得できませんでした．"
-        )
-
-    # ------------------------------------------------------------
-    # SurveyResponseへ変換
-    # ------------------------------------------------------------
-    response = SurveyResponse.from_dict(
-        response_data,
-    )
-
-    # ------------------------------------------------------------
-    # draftであることを確認
-    # ------------------------------------------------------------
-    if response.response_status != "draft":
-        raise ValueError(
-            "途中保存した回答の状態がdraftではありません．"
-        )
-
-    # ------------------------------------------------------------
-    # DB更新日時
-    # ------------------------------------------------------------
-    updated_at = (
-        saved_at.isoformat()
-        if isinstance(
-            saved_at,
-            datetime,
-        )
-        else datetime.now(
-            timezone.utc,
-        ).isoformat()
-    )
-
-    # ------------------------------------------------------------
-    # SQLite管理情報を更新
-    #
-    # draft → draft
-    # - 同じ現在回答を更新
-    #
-    # submitted → draft
-    # - 前回正式回答を履歴へ退避し，
-    #   新しいdraftを現在回答として登録
-    # ------------------------------------------------------------
-    upsert_active_response(
-        paths.db_path,
-        response=response,
-        response_path=Path(
-            response_path,
-        ),
-        updated_at=updated_at,
-    )
 
 # ============================================================
 # アンケート概要表示
@@ -773,23 +585,6 @@ def render_survey_overview(
             st.info(
                 "未回答です．"
             )
-
-        elif (
-            existing_response.response_status
-            == "draft"
-        ):
-            st.warning(
-                "回答途中です．"
-            )
-
-            st.caption(
-                "最終保存日時："
-                + format_datetime_jst(
-                    existing_response.saved_at,
-                    empty_text="不明",
-                )
-            )
-
         else:
             st.success(
                 "回答済みです．"
@@ -806,7 +601,8 @@ def render_survey_overview(
             st.caption(
                 "回答回数："
                 f"{existing_response.response_revision}"
-            )  
+            )
+
 
 # ============================================================
 # 回答開始画面
@@ -818,9 +614,6 @@ def render_start_screen(
     existing_response: SurveyResponse | None,
     phase_key: str,
 ) -> None:
-    # ------------------------------------------------------------
-    # 未回答
-    # ------------------------------------------------------------
     if existing_response is None:
         if st.button(
             "アンケートを開始",
@@ -835,56 +628,23 @@ def render_start_screen(
                 definition=definition,
                 user_sub=user_sub,
                 phase_key=phase_key,
+                loaded_response=None,
             )
 
         return
 
-    # ------------------------------------------------------------
-    # 回答途中
-    # ------------------------------------------------------------
-    if (
-        existing_response.response_status
-        == "draft"
-    ):
-        st.warning(
-            "このアンケートは回答途中です．"
-        )
-
-        st.caption(
-            "途中保存した回答内容から"
-            "回答を再開できます．"
-        )
-
-        if st.button(
-            "回答を再開",
-            key=(
-                f"{PAGE_NAME}:"
-                f"{definition.survey_id}:"
-                "resume"
-            ),
-            type="primary",
-        ):
-            start_survey(
-                definition=definition,
-                user_sub=user_sub,
-                phase_key=phase_key,
-                existing_response=existing_response,
-                resume_draft=True,
-            )
-
-        return
-
-    # ------------------------------------------------------------
-    # 回答済み
-    # ------------------------------------------------------------
     st.success(
         "このアンケートには回答済みです．"
     )
 
-    st.caption(
-        "再回答を送信すると，新しい回答が有効になります．"
-        "再回答を送信するまでは，現在の回答が保持されます．"
-    )
+    st.markdown(
+        """
+        **再回答について**
+
+        - ☑️ チェックすると，前回の回答を読み込みます．
+        - ✏️ 内容を修正して送信すると，最新の回答に更新されます．
+        """
+            )
 
     confirm_reanswer = st.checkbox(
         "現在の回答を更新し，再回答する",
@@ -911,8 +671,13 @@ def render_start_screen(
             definition=definition,
             user_sub=user_sub,
             phase_key=phase_key,
-            existing_response=existing_response,
-            reanswer=True,
+            loaded_response={
+                "survey_version": existing_response.survey_version,
+                "answers": dict(existing_response.answers),
+                "response_revision": (
+                    existing_response.response_revision + 1
+                ),
+            },
         )
 
 
@@ -1085,52 +850,13 @@ def render_answer_screen(
     # ------------------------------------------------------------
     st.markdown("---")
 
-    first_col, previous_col, next_col = st.columns(
+    previous_col, next_col = st.columns(
         [
-            1,
             1,
             1,
         ],
     )
 
-    # ------------------------------------------------------------
-    # 最初に戻る
-    # ------------------------------------------------------------
-    with first_col:
-        if st.button(
-            "最初に戻る",
-            key=(
-                f"{PAGE_NAME}:"
-                f"{definition.survey_id}:"
-                f"{question.question_id}:"
-                "first"
-            ),
-            disabled=(current_index <= 0),
-        ):
-            # ----------------------------------------------------
-            # 現在入力中の回答を先に保存
-            # ----------------------------------------------------
-            set_runtime_answer(
-                survey_definition=definition,
-                survey_id=definition.survey_id,
-                user_sub=user_sub,
-                question_id=question.question_id,
-                answer_value=normalized_answer,
-                session_state=st.session_state,
-            )
-
-            move_runtime_to_first_question(
-                survey_definition=definition,
-                survey_id=definition.survey_id,
-                user_sub=user_sub,
-                session_state=st.session_state,
-            )
-
-            st.rerun()
-
-    # ------------------------------------------------------------
-    # 戻る
-    # ------------------------------------------------------------
     with previous_col:
         if st.button(
             "戻る",
@@ -1142,18 +868,6 @@ def render_answer_screen(
             ),
             disabled=(current_index <= 0),
         ):
-            # ----------------------------------------------------
-            # 現在入力中の回答を先に保存
-            # ----------------------------------------------------
-            set_runtime_answer(
-                survey_definition=definition,
-                survey_id=definition.survey_id,
-                user_sub=user_sub,
-                question_id=question.question_id,
-                answer_value=normalized_answer,
-                session_state=st.session_state,
-            )
-
             move_runtime_to_previous_question(
                 survey_definition=definition,
                 survey_id=definition.survey_id,
@@ -1163,9 +877,6 @@ def render_answer_screen(
 
             st.rerun()
 
-    # ------------------------------------------------------------
-    # 次へ
-    # ------------------------------------------------------------
     with next_col:
         next_label = (
             "回答確認へ"
@@ -1190,14 +901,12 @@ def render_answer_screen(
 
             if not validation.is_valid:
                 for issue in validation.errors:
-                    st.error(
-                        issue.message
-                    )
+                    st.error(issue.message)
 
             else:
-                # ------------------------------------------------
+                # --------------------------------------------------------
                 # 回答をランタイムへ保存
-                # ------------------------------------------------
+                # --------------------------------------------------------
                 set_runtime_answer(
                     survey_definition=definition,
                     survey_id=definition.survey_id,
@@ -1207,14 +916,8 @@ def render_answer_screen(
                     session_state=st.session_state,
                 )
 
-                if (
-                    current_index
-                    >= len(visible_ids) - 1
-                ):
-                    st.session_state[
-                        phase_key
-                    ] = PHASE_CONFIRM
-
+                if current_index >= len(visible_ids) - 1:
+                    st.session_state[phase_key] = PHASE_CONFIRM
                     st.rerun()
 
                 move_runtime_to_next_question(
@@ -1226,60 +929,6 @@ def render_answer_screen(
 
                 st.rerun()
 
-    # ------------------------------------------------------------
-    # 以降の回答をスキップ
-    # ------------------------------------------------------------
-    if st.button(
-        "以降の回答をスキップ",
-        key=(
-            f"{PAGE_NAME}:"
-            f"{definition.survey_id}:"
-            f"{question.question_id}:"
-            "skip_remaining"
-        ),
-    ):
-
-        # --------------------------------------------------------
-        # 現在の質問
-        #
-        # 回答済みの場合
-        # - 現在の回答をそのまま保持する
-        #
-        # 未回答の場合
-        # - 「回答をスキップする」を設定する
-        #
-        # これにより「以降の回答をスキップ」は，
-        # 現在の未回答質問を含めて以降をスキップする．
-        # --------------------------------------------------------
-        if normalized_answer is not None:
-            current_answer_value = normalized_answer
-
-        else:
-            current_answer_value = SURVEY_ANSWER_SKIP
-
-        set_runtime_answer(
-            survey_definition=definition,
-            survey_id=definition.survey_id,
-            user_sub=user_sub,
-            question_id=question.question_id,
-            answer_value=current_answer_value,
-            session_state=st.session_state,
-        )
-        # --------------------------------------------------------
-        # 現在より後ろの未回答だけをスキップ
-        # --------------------------------------------------------
-        skip_remaining_runtime_answers(
-            survey_definition=definition,
-            survey_id=definition.survey_id,
-            user_sub=user_sub,
-            session_state=st.session_state,
-        )
-
-        st.session_state[
-            phase_key
-        ] = PHASE_CONFIRM
-
-        st.rerun()    
 
 # ============================================================
 # 回答確認画面
@@ -1360,9 +1009,8 @@ def render_confirmation_screen(
     # ------------------------------------------------------------
     # 操作
     # ------------------------------------------------------------
-    back_col, save_col, submit_col = st.columns(
+    back_col, submit_col = st.columns(
         [
-            1,
             1,
             1,
         ],
@@ -1378,108 +1026,6 @@ def render_confirmation_screen(
             ),
         ):
             st.session_state[phase_key] = PHASE_ANSWERING
-            st.rerun()
-
-    # ------------------------------------------------------------
-    # 途中で保存
-    # ------------------------------------------------------------
-    with save_col:
-        if st.button(
-            "途中で保存",
-            key=(
-                f"{PAGE_NAME}:"
-                f"{definition.survey_id}:"
-                "save_draft"
-            ),
-        ):
-            # ----------------------------------------------------
-            # 実施期間を再確認
-            # ----------------------------------------------------
-            publication = get_survey_publication(
-                status=status,
-                now=datetime.now(
-                    timezone.utc,
-                ),
-            )
-
-            if not publication.can_submit:
-                st.error(
-                    publication.message,
-                )
-                return
-
-            # ----------------------------------------------------
-            # 下書き保存
-            # ----------------------------------------------------
-            try:
-                with st.spinner(
-                    "回答途中の内容を保存しています．"
-                ):
-                    save_result = (
-                        save_survey_runtime_draft(
-                            survey_root=(
-                                paths.responses_root
-                            ),
-                            survey_definition=definition,
-                            survey_id=(
-                                definition.survey_id
-                            ),
-                            user_sub=user_sub,
-                            additional_response_data={
-                                "user_name": user_sub,
-                                "answered_from": (
-                                    "auth_portal_app/"
-                                    "pages/"
-                                    "65_社内アンケート.py"
-                                ),
-                            },
-                            session_state=(
-                                st.session_state
-                            ),
-                        )
-                    )
-
-            except Exception as exc:
-                st.error(
-                    "途中保存に失敗しました："
-                    f"{exc}"
-                )
-                return
-
-            if not save_result.success:
-                st.error(
-                    save_result.message
-                )
-                return
-
-            # ----------------------------------------------------
-            # SQLiteへ途中回答を登録
-            # ----------------------------------------------------
-            try:
-                register_draft_response_to_db(
-                    paths=paths,
-                    save_result=save_result,
-                )
-
-            except Exception as exc:
-                st.error(
-                    "回答ファイルは保存されましたが，"
-                    "回答管理DBを更新できませんでした："
-                    f"{exc}"
-                )
-                return           
-
-            # ----------------------------------------------------
-            # 保存完了
-            #
-            # トップ画面へ戻し，
-            # 保存済みdraftを読み直して
-            # 「回答途中です」「回答を再開」を表示する．
-            # ----------------------------------------------------
-            st.session_state[
-                phase_key
-            ] = PHASE_TOP
-
             st.rerun()
 
     with submit_col:

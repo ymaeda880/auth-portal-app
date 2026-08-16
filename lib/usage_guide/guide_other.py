@@ -181,7 +181,7 @@ ITEM_INTERNAL_DOCUMENT_VIEWER = GuideItem(
 タグやファイル名を入力して，社内共有文書を検索します．
 
 <div class="guide-note">
-<span class="guide-route">ポータル ▶ その他 ▶ 社内文書ビューア</span><br>
+<span class="guide-route">ポータル ▶ 社内文書ビューア</span><br>
 </div>
 """,
                 ),
@@ -244,8 +244,9 @@ ITEM_FEEDBACK = GuideItem(
             title="概要",
             body="""
 PAISに関する要望，不具合，質問などを管理者へ送信できます．
+送信された内容は，PAISの改善や問題対応に利用されます．ここからの問い合わせは回答までに時間がかかります．
 
-送信された内容は，PAISの改善や問題対応に利用されます．
+<strong>緊急の問い合わせはシステム管理者に直接メールを送ってください．</strong>
 """,
         ),
 
@@ -274,7 +275,7 @@ PAISに関する要望，不具合，質問などを管理者へ送信できま�
 【要望】【不具合】【問い合わせ】【その他】から種別を選択します．
 
 <div class="guide-note">
-<span class="guide-route">ポータル ▶ その他 ▶ 要望・問い合わせ</span><br>
+<span class="guide-route">ポータル ▶ 要望・問い合わせ</span><br>
 </div>
 """,
                 ),
@@ -299,7 +300,6 @@ PAISに関する要望，不具合，質問などを管理者へ送信できま�
                     title="③ 管理者へ送信する",
                     body="""
 入力内容を確認して【送信】を押します．
-
 送信が完了すると，受付IDと受付時刻が表示されます．
 """,
                 ),
@@ -368,7 +368,7 @@ ITEM_INTERNAL_SURVEY = GuideItem(
 実施中のアンケートから，回答するアンケートを選択します．
 
 <div class="guide-note">
-<span class="guide-route">ポータル ▶ その他 ▶ 社内アンケート</span><br>
+<span class="guide-route">ポータル ▶ 社内アンケート</span><br>
 </div>
 """,
                 ),

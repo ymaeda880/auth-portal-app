@@ -43,10 +43,6 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 
-from .answer_values import (
-    SURVEY_ANSWER_SKIP,
-)
-
 from .condition_evaluator import (
     get_visible_questions,
 )
@@ -431,21 +427,6 @@ def validate_question_answer(
         return QuestionAnswerValidationResult(
             normalized_value=None,
             should_include=False,
-            errors=tuple(errors),
-            warnings=tuple(warnings),
-        )
-
-    # ------------------------------------------------------------
-    # 特別回答：「回答をスキップする」
-    #
-    # 個別質問の skip_button=true による回答だけでなく，
-    # 「以降の回答をスキップ」によって設定された
-    # 全質問形式のスキップ回答も正式な回答として認める．
-    # ------------------------------------------------------------
-    if value == SURVEY_ANSWER_SKIP:
-        return QuestionAnswerValidationResult(
-            normalized_value=SURVEY_ANSWER_SKIP,
-            should_include=True,
             errors=tuple(errors),
             warnings=tuple(warnings),
         )

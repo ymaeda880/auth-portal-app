@@ -34,10 +34,8 @@ import streamlit as st
 # imports（アンケート）
 # ============================================================
 from lib.survey.answer_values import (
-    SURVEY_ANSWER_SKIP,
     get_survey_special_answer_label,
 )
-
 from lib.survey.models import (
     SurveyDefinition,
     SurveyQuestion,
@@ -118,27 +116,20 @@ def get_option_values(
 ) -> list[str]:
     # --------------------------------------------------------
     # Widgetとshow_ifで利用する内部回答値
+    #
+    # SurveyTex：
+    # 1|使用したことがある
+    #
+    # 内部値：
+    # "1"
+    #
+    # 表示ラベル：
+    # "使用したことがある"
     # --------------------------------------------------------
-    values = [
+    return [
         str(option.value)
         for option in question.options
     ]
-
-    # --------------------------------------------------------
-    # 「回答をスキップする」
-    #
-    # SurveyTexで skip_button=true が指定された
-    # radio・select質問だけに特別回答を追加する．
-    # --------------------------------------------------------
-    if (
-        question.skip_button
-        and SURVEY_ANSWER_SKIP not in values
-    ):
-        values.append(
-            SURVEY_ANSWER_SKIP
-        )
-
-    return values
 
 
 def get_option_label(
@@ -148,21 +139,6 @@ def get_option_label(
 ) -> str:
     normalized_value = str(value)
 
-    # --------------------------------------------------------
-    # 特別回答
-    # --------------------------------------------------------
-    special_label = (
-        get_survey_special_answer_label(
-            normalized_value,
-        )
-    )
-
-    if special_label is not None:
-        return special_label
-
-    # --------------------------------------------------------
-    # 通常選択肢
-    # --------------------------------------------------------
     for option in question.options:
         if str(option.value) == normalized_value:
             return str(option.label)
