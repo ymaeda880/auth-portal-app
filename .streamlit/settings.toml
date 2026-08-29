@@ -15,7 +15,7 @@ apps = [
 # ログイン必須（一般ユーザー）
 [access.user]
 apps = [
-    "bot",              # RAGチャットボット
+    #"bot",              # RAGチャットボット
     "minutes",          # 議事録生成アプリ
     "text_studio",      # 文書校正アプリ
     "image_maker",       # 画像生成アプリ
@@ -44,6 +44,12 @@ apps = [
 # -------------------------------
 [admin_users]
 users = ["maeda", "admin", "t-okamoto", "y-maeda", "h-maeda"]
+
+# -------------------------------
+# 開発者ユーザー
+# -------------------------------
+[developer_user]
+user = "maeda"
 
 # -------------------------------
 # 制限アプリ（restricted）の許可ユーザー
