@@ -31,6 +31,7 @@ from .guide_document_creation import GUIDE_DOCUMENT_CREATION
 
 from .guide_report_search import GUIDE_REPORT_SEARCH
 from .guide_file_management import GUIDE_FILE_MANAGEMENT
+from .guide_project_hub import GUIDE_PROJECT_HUB
 from .guide_other import GUIDE_OTHER
 
 from .pais_design_policy import INFO_PAIS_DESIGN_POLICY
@@ -66,6 +67,7 @@ GUIDE_CATEGORIES: tuple[GuideCategory, ...] = (
     GUIDE_DOCUMENT_CREATION,
     #GUIDE_REPORT_SEARCH,
     GUIDE_FILE_MANAGEMENT,
+    GUIDE_PROJECT_HUB,
     GUIDE_OTHER,
 )
 

@@ -398,7 +398,7 @@ ITEM_AI_FIGURE_TABLE_CHECK = GuideItem(
     summary="図表タイトルと本文中の参照との整合性を確認します．",
     #app_name="テキスト・スタジオ",
     #page_name="AI図表チェック",
-    uses_ai=False,
+    uses_ai=True,
     sections=(
 
 # --------------------------------------------------------
