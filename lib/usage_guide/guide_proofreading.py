@@ -123,7 +123,7 @@ ITEM_WORD_PROOFREADING = GuideItem(
     title="Word文章の校正を行いたい",
     summary="Word文書の誤字脱字や表現の揺れなどを確認します．",
     # app_name="テキスト・スタジオ",
-    # page_name="一括Word校正",
+    # page_name="Word校正",
     uses_ai=True,
     sections=(
 
@@ -159,7 +159,7 @@ GuideSubSection(
 title="① Word文章の校正を行う",
 body="""
 <div class="guide-note">
-<span class="guide-route">ポータル ▶ テキストスタジオ ▶ 一括Word校正</span><br>
+<span class="guide-route">ポータル ▶ テキストスタジオ ▶ Word校正</span><br>
 </div>
 校正するWord文章を設定して，校正を行う．
 """,

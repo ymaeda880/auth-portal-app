@@ -41,6 +41,17 @@ from common_lib.ui.nav_icons import (
 )
 
 # ============================================================
+# navigation access
+# ============================================================
+
+from common_lib.ui.navigation_access import (
+    clean_navigation_groups,
+    nav_group,
+    nav_page,
+    set_navigation_debug_general_user,
+)
+
+# ============================================================
 # page config
 # ============================================================
 st.set_page_config(
@@ -50,36 +61,64 @@ st.set_page_config(
 )
 
 # ============================================================
+# DEBUG：navigation表示切替
+# ============================================================
+
+# ------------------------------------------------------------
+# True:
+#   管理者でログインしていても一般ユーザー用navigationを表示
+#
+# False:
+#   実際のログインユーザーの権限に従う
+# ------------------------------------------------------------
+
+DEBUG_FORCE_GENERAL_USER = False
+#DEBUG_FORCE_GENERAL_USER = True
+
+set_navigation_debug_general_user(
+    DEBUG_FORCE_GENERAL_USER
+)
+
+# ============================================================
 # navigation
 # ============================================================
 pg = st.navigation(
     {
-        f"{NAV_HOME_ICON}": [
-            st.Page(
-                "pages/00_トップ.py",
-                title="Home",
-                icon=PAGE_HOME_ICON,
-                default=True,
-                url_path="top",
-            ),
-            st.Page("pages/03_ユーザー情報登録.py", title="ユーザー情報登録", icon="👤", url_path="03_user_info"),
-            st.Page(
-                "pages/110_ログイン.py",
-                title="ログイン",
-                icon="🔐",
-                url_path="110_login",
-            ),
-            st.Page(
-                "pages/130_使い方.py",
-                title="PAISの使い方",
-                icon="📘",
-                url_path="130_usage_guide",
-            ),
-        ],
+        f"{NAV_HOME_ICON}": nav_group(
+            [
+                st.Page(
+                    "pages/00_トップ.py",
+                    title="Home",
+                    icon=PAGE_HOME_ICON,
+                    default=True,
+                    url_path="top",
+                ),
+                st.Page(
+                    "pages/03_ユーザー情報登録.py",
+                    title="ユーザー情報登録",
+                    icon="👤",
+                    url_path="03_user_info",
+                ),
+                nav_page(
+                    "pages/110_ログイン.py",
+                    title="ログイン",
+                    icon="🔐",
+                    url_path="110_login",
+                    developer_only=True,
+                ),
+                st.Page(
+                    "pages/130_使い方.py",
+                    title="PAISの使い方",
+                    icon="📘",
+                    url_path="130_usage_guide",
+                ),
+            ]
+        ),
 
         # "👤 ユーザー": [
         #     st.Page("pages/03_ユーザー情報登録.py", title="ユーザー情報登録", icon="👤", url_path="03_user_info"),
         # ],
+
 
         f"{NAV_CONSTRUCTION_ICON} メモ（作成中）": [
             st.Page("pages/05_メモ一覧・検索.py", title="メモ一覧・検索", icon="🔎", url_path="05_memo_search"),
@@ -118,17 +157,35 @@ pg = st.navigation(
         ],
 
 
-        f"{NAV_STOP_ICON} 管理者用": [
-            st.Page("pages/88_告知管理.py", title="告知管理", icon="📢", url_path="88_notice_admin"),
-            st.Page("pages/90_問い合わせ管理.py", title="問い合わせ管理", icon="📬", url_path="90_contact_admin"),
-            st.Page(
-                "pages/120_アンケート管理.py",
-                title="アンケート管理",
-                icon="📊",
-                url_path="120_survey_admin",
-            ),            
-            st.Page("pages/92_ユーザー管理.py", title="ユーザー管理", icon="👥", url_path="92_user_admin"),
-        ],
+        f"{NAV_STOP_ICON} 管理者用": nav_group(
+            [
+                st.Page(
+                    "pages/88_告知管理.py",
+                    title="告知管理",
+                    icon="📢",
+                    url_path="88_notice_admin",
+                ),
+                st.Page(
+                    "pages/90_問い合わせ管理.py",
+                    title="問い合わせ管理",
+                    icon="📬",
+                    url_path="90_contact_admin",
+                ),
+                st.Page(
+                    "pages/120_アンケート管理.py",
+                    title="アンケート管理",
+                    icon="📊",
+                    url_path="120_survey_admin",
+                ),
+                st.Page(
+                    "pages/92_ユーザー管理.py",
+                    title="ユーザー管理",
+                    icon="👥",
+                    url_path="92_user_admin",
+                ),
+            ],
+            admin_only=True,
+        ),
     }
 )
 
