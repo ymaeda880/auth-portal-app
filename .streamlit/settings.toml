@@ -51,6 +51,13 @@ users = ["maeda", "admin", "t-okamoto", "y-maeda", "h-maeda"]
 [developer_user]
 user = "maeda"
 
+# auth_portal_app/.streamlit/settings.toml
+# -------------------------------
+# 企画部門ユーザー
+# -------------------------------
+[planning_users]
+users = ["maeda", "admin", "t-okamoto", "y-maeda", "h-maeda"]
+
 # -------------------------------
 # 制限アプリ（restricted）の許可ユーザー
 # -------------------------------
